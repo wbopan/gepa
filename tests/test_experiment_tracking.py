@@ -9,8 +9,9 @@ from gepa.logging.experiment_tracker import ExperimentTracker, create_experiment
 def has_weave():
     """Check if weave and wandb are available."""
     try:
-        import wandb  # noqa: F401
         import weave  # noqa: F401
+
+        import wandb  # noqa: F401
 
         return True
     except ImportError:
@@ -44,7 +45,7 @@ class TestCreateExperimentTracker:
         """Test that default project name is set when not provided."""
         tracker = create_experiment_tracker(use_weave=True)
 
-        assert tracker.weave_project_name == "gepa-optimization"
+        assert tracker.weave_project_name == "gepa-boost"
 
     def test_create_experiment_tracker_factory(self):
         """Test the create_experiment_tracker factory function."""
@@ -128,33 +129,43 @@ class TestExperimentTrackerIntegration:
 
         # No errors should occur
 
-    def test_log_prompt_artifact_no_weave(self):
-        """Test logging prompt artifact with weave disabled (no-op)."""
+    def test_publish_proposed_prompt_no_weave(self):
+        """Test publishing proposed prompt with weave disabled (no-op)."""
         tracker = ExperimentTracker(use_weave=False)
 
         with tracker:
-            # Should not raise any errors even though weave is disabled
-            tracker.log_prompt_artifact(
-                prompt={"system": "You are a helpful assistant."},
-                candidate_idx=0,
+            # Should return None and not raise any errors when weave is disabled
+            result = tracker.publish_proposed_prompt(
+                content={"system": "You are a helpful assistant."},
                 iteration=1,
-                is_best=True,
-                parent_idx=None,
+                parent_ref=None,
+                minibatch_score_before=0.5,
+                minibatch_score_after=0.7,
+                accepted=True,
+            )
+            assert result is None
+
+    def test_publish_accepted_prompt_no_weave(self):
+        """Test publishing accepted prompt with weave disabled (no-op)."""
+        tracker = ExperimentTracker(use_weave=False)
+
+        with tracker:
+            # Should return None and not raise any errors when weave is disabled
+            result = tracker.publish_accepted_prompt(
+                proposed_ref="weave:///test/ref",
+                candidate_idx=0,
                 valset_score=0.95,
             )
+            assert result is None
 
-    def test_log_score_distribution_no_weave(self):
-        """Test logging score distribution with weave disabled (no-op)."""
+    def test_get_prompt_ref_no_weave(self):
+        """Test getting prompt ref with weave disabled."""
         tracker = ExperimentTracker(use_weave=False)
 
         with tracker:
-            # Should not raise any errors even though weave is disabled
-            tracker.log_score_distribution(
-                scores_by_val_id={0: 0.9, 1: 0.8, 2: 0.95},
-                candidate_idx=0,
-                iteration=1,
-                objective_scores={"accuracy": 0.9},
-            )
+            # Should return None when no refs have been published
+            result = tracker.get_prompt_ref(0)
+            assert result is None
 
     def test_log_final_results_no_weave(self):
         """Test logging final results with weave disabled (no-op)."""

@@ -17,6 +17,7 @@ from gepa.core.data_loader import DataId, DataLoader
 from gepa.core.state import GEPAState, ObjectiveScores, ProgramIdx
 from gepa.gepa_utils import find_dominator_programs
 from gepa.logging.logger import LoggerProtocol
+from gepa.logging.weave_tracing import add_call_feedback, weave_op
 from gepa.proposer.base import CandidateProposal, ProposeNewCandidate
 
 AncestorLog = tuple[int, int, int]
@@ -287,6 +288,7 @@ class MergeProposer(ProposeNewCandidate[DataId]):
 
         return selected[:num_subsample_ids]
 
+    @weave_op("gepa.propose.merge")
     def propose(self, state: GEPAState[RolloutOutput, DataId]) -> CandidateProposal[DataId] | None:
         i = state.i + 1
         state.full_program_trace[-1]["invoked_merge"] = True
@@ -391,6 +393,15 @@ class MergeProposer(ProposeNewCandidate[DataId]):
 
         # Count evals via hook mechanism
         state.increment_evals(actual_evals_count)
+
+        # Add feedback with merge scores
+        add_call_feedback(
+            scores={
+                "parent1_score": sum(id1_sub_scores),
+                "parent2_score": sum(id2_sub_scores),
+                "merged_score": sum(new_sub_scores),
+            },
+        )
 
         # Acceptance will be evaluated by engine (>= max(parents))
         return CandidateProposal(

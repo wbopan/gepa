@@ -95,6 +95,7 @@ def log_detailed_metrics_after_discovering_new_program(
     logger.log(f"Iteration {gepa_state.i + 1}: New program candidate index: {new_program_idx}", header="iter")
 
     metrics = {
+        "iteration": gepa_state.i + 1,
         "new_program_idx": new_program_idx,
         "valset_pareto_front_agg": pareto_avg,
         "valset_pareto_front_programs": {k: list(v) for k, v in gepa_state.program_at_pareto_front_valset.items()},
@@ -105,7 +106,6 @@ def log_detailed_metrics_after_discovering_new_program(
         "val_evaluated_count_new_program": coverage,
         "val_total_count": valset_size,
         "val_program_average": valset_score,
-        "total_metric_calls": gepa_state.total_num_evals,
     }
     if log_individual_valset_scores_and_programs:
         metrics.update(
@@ -126,26 +126,4 @@ def log_detailed_metrics_after_discovering_new_program(
             k: list(v) for k, v in gepa_state.program_at_pareto_front_objectives.items()
         }
 
-    experiment_tracker.log_metrics(metrics, step=gepa_state.i)
-
-    # Log artifacts for accepted candidates
-    parent_idx = None
-    parents = gepa_state.parent_program_for_candidate[new_program_idx]
-    if parents:
-        parent_idx = parents[0]
-
-    experiment_tracker.log_prompt_artifact(
-        prompt=gepa_state.program_candidates[new_program_idx],
-        candidate_idx=new_program_idx,
-        iteration=gepa_state.i + 1,
-        is_best=(new_program_idx == linear_pareto_front_program_idx),
-        parent_idx=parent_idx,
-        valset_score=valset_score,
-    )
-
-    experiment_tracker.log_score_distribution(
-        scores_by_val_id=dict(valset_scores),
-        candidate_idx=new_program_idx,
-        iteration=gepa_state.i + 1,
-        objective_scores=objective_scores,
-    )
+    experiment_tracker.log_metrics(metrics, step=gepa_state.total_num_evals)

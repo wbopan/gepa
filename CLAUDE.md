@@ -85,5 +85,6 @@ The codebase uses TypeVars (`DataInst`, `Trajectory`, `RolloutOutput`) allowing 
 
 When modifying existing code or adding new features:
 
+- **Breaking changes allowed**: Feel free to make breaking changes without considering backward compatibility.
 - **Minimize changes**: Make the smallest possible modification that achieves the goal. Avoid refactoring unrelated code or adding unnecessary abstractions.
 - **Follow existing patterns**: Study how similar functionality is implemented elsewhere in the codebase and mirror those conventions. For example:

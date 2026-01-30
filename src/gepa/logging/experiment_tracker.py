@@ -3,6 +3,8 @@
 
 from typing import Any
 
+from gepa.logging.weave_tracing import configure_weave_tracing
+
 
 class ExperimentTracker:
     """Experiment tracking using wandb weave."""
@@ -13,7 +15,8 @@ class ExperimentTracker:
         weave_project_name: str | None = None,
     ):
         self.use_weave = use_weave
-        self.weave_project_name = weave_project_name or "gepa-optimization"
+        self.weave_project_name = weave_project_name or "gepa-boost"
+        self._prompt_refs: dict[int, str] = {}  # candidate_idx -> AcceptedPrompt ref
 
     def __enter__(self):
         self.start_run()
@@ -38,16 +41,28 @@ class ExperimentTracker:
 
                 wandb.login()
                 wandb.init(project=self.weave_project_name)
+
+                # Configure weave tracing for hierarchical call organization
+                configure_weave_tracing(enabled=True, client=weave)
             except ImportError:
                 raise ImportError("weave is not installed. Install with: pip install 'weave[litellm]'")
 
-    def log_metrics(self, metrics: dict[str, Any], step: int | None = None):
-        """Log time-series metrics to wandb."""
+    def log_metrics(self, metrics: dict[str, Any], step: int | None = None, commit: bool = True):
+        """Log time-series metrics to wandb.
+
+        Args:
+            metrics: Dictionary of metric name to value.
+            step: The step number for this log entry.
+            commit: If True (default), finalize this step. If False, allow additional
+                   metrics to be logged at the same step before committing.
+                   Use commit=False when logging multiple metrics at the same step,
+                   then commit=True on the final log call for that step.
+        """
         if self.use_weave:
             try:
                 import wandb
 
-                wandb.log(metrics, step=step)
+                wandb.log(metrics, step=step, commit=commit)
             except Exception as e:
                 print(f"Warning: Failed to log metrics: {e}")
 
@@ -68,6 +83,9 @@ class ExperimentTracker:
             try:
                 import wandb
 
+                # Disable weave tracing
+                configure_weave_tracing(enabled=False, client=None)
+
                 if wandb.run is not None:
                     wandb.finish()
             except Exception as e:
@@ -84,68 +102,67 @@ class ExperimentTracker:
                 pass
         return False
 
-    def log_prompt_artifact(
+    def publish_proposed_prompt(
         self,
-        prompt: dict[str, str],
-        candidate_idx: int,
+        content: dict[str, str],
         iteration: int,
-        is_best: bool = False,
-        parent_idx: int | None = None,
-        valset_score: float | None = None,
-    ) -> None:
-        """Save candidate prompt as wandb artifact."""
+        parent_ref: str | None,
+        minibatch_score_before: float,
+        minibatch_score_after: float,
+        accepted: bool,
+    ) -> str | None:
+        """Publish a ProposedPrompt and return its ref URI."""
         if not self.use_weave:
-            return
+            return None
         try:
-            import wandb
+            import weave
 
-            # Create text content
-            lines = [f"# Candidate {candidate_idx} - Iteration {iteration}"]
-            if parent_idx is not None:
-                lines.append(f"# Parent: Candidate {parent_idx}")
-            if valset_score is not None:
-                lines.append(f"# Valset Score: {valset_score:.4f}")
-            lines.append("")
-            for component_name, component_text in prompt.items():
-                lines.append(f"## {component_name}")
-                lines.append(component_text)
-                lines.append("")
+            from gepa.logging.prompt_tracker import ProposedPrompt
 
-            # Log as table for easy viewing
-            table = wandb.Table(columns=["component", "text"])
-            for component_name, component_text in prompt.items():
-                table.add_data(component_name, component_text)
-            wandb.log({f"prompts/candidate_{candidate_idx:03d}": table})
-
-            # Update summary if best
-            if is_best:
-                wandb.summary["best_prompt"] = prompt
-                wandb.summary["best_candidate_idx"] = candidate_idx
+            prompt = ProposedPrompt(
+                content=content,
+                parent_ref=parent_ref,
+                iteration=iteration,
+                minibatch_score_before=minibatch_score_before,
+                minibatch_score_after=minibatch_score_after,
+                accepted=accepted,
+            )
+            ref = weave.publish(prompt)
+            return str(ref.uri())
         except Exception as e:
-            print(f"Warning: Failed to log prompt artifact: {e}")
+            print(f"Warning: Failed to publish proposed prompt: {e}")
+            return None
 
-    def log_score_distribution(
+    def publish_accepted_prompt(
         self,
-        scores_by_val_id: dict,
+        proposed_ref: str,
         candidate_idx: int,
-        iteration: int,
-        objective_scores: dict | None = None,
-    ) -> None:
-        """Save per-example scores as wandb table."""
+        valset_score: float,
+    ) -> str | None:
+        """Publish an AcceptedPrompt and return its ref URI."""
         if not self.use_weave:
-            return
+            return None
         try:
-            import wandb
+            import weave
 
-            table = wandb.Table(columns=["val_id", "score"])
-            for val_id, score in scores_by_val_id.items():
-                table.add_data(str(val_id), score)
-            wandb.log({f"scores/candidate_{candidate_idx:03d}": table})
+            from gepa.logging.prompt_tracker import AcceptedPrompt
 
-            if objective_scores:
-                wandb.log({f"objective_scores/candidate_{candidate_idx}": objective_scores})
+            prompt = AcceptedPrompt(
+                proposed_ref=proposed_ref,
+                candidate_idx=candidate_idx,
+                valset_score=valset_score,
+            )
+            ref = weave.publish(prompt)
+            ref_uri = str(ref.uri())
+            self._prompt_refs[candidate_idx] = ref_uri
+            return ref_uri
         except Exception as e:
-            print(f"Warning: Failed to log score distribution: {e}")
+            print(f"Warning: Failed to publish accepted prompt: {e}")
+            return None
+
+    def get_prompt_ref(self, candidate_idx: int) -> str | None:
+        """Get the AcceptedPrompt ref for a candidate index."""
+        return self._prompt_refs.get(candidate_idx)
 
     def log_final_results(
         self,

@@ -12,7 +12,7 @@ import litellm
 from litellm.integrations.custom_logger import CustomLogger
 
 import gepa
-from gepa import get_logger
+from gepa import configure_cache, get_logger
 from gepa.examples.gpqa import init_dataset
 
 # Suppress noisy output
@@ -125,6 +125,9 @@ def main():
     logger.log(f"Reflection LM: {reflection_model}", header="config")
     logger.show(seed_prompt["system_prompt"], title="Seed Prompt")
 
+    # Configure LiteLLM cache before optimization
+    configure_cache("disk")
+
     # Run GEPA optimization
     result = gepa.optimize(
         seed_candidate=seed_prompt,
@@ -136,7 +139,6 @@ def main():
         reflection_minibatch_size=5,
         display_progress_bar=True,
         seed=42,
-        litellm_cache=True,
         use_weave=True,
         weave_project_name="gpqa-diamond-dpsk",
         callbacks=[VerboseCallback()],  # pyright: ignore[reportArgumentType]

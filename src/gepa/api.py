@@ -21,6 +21,7 @@ from gepa.core.result import GEPAResult
 from gepa.core.state import EvaluationCache, FrontierType
 from gepa.logging.experiment_tracker import create_experiment_tracker
 from gepa.logging.logger import LoggerProtocol, get_logger
+from gepa.logging.weave_tracing import weave_op
 from gepa.proposer.merge import MergeProposer
 from gepa.proposer.reflective_mutation.base import CandidateSelector, LanguageModel, ReflectionComponentSelector
 from gepa.proposer.reflective_mutation.reflective_mutation import ReflectiveMutationProposer
@@ -78,8 +79,6 @@ def optimize(
     seed: int = 0,
     raise_on_exception: bool = True,
     val_evaluation_policy: EvaluationPolicy[DataId, DataInst] | Literal["full_eval"] | None = None,
-    # LiteLLM configuration
-    litellm_cache: bool = True,
 ) -> GEPAResult[RolloutOutput, DataId]:
     """
     GEPA is an evolutionary optimizer that evolves (multiple) text components of a complex system to optimize them towards a given metric.
@@ -151,7 +150,7 @@ def optimize(
     - callbacks: Optional list of callback objects for observing optimization progress. Callbacks receive events like on_optimization_start, on_iteration_start, on_candidate_accepted, etc. See `gepa.core.callbacks.GEPACallback` for the full protocol.
     - run_dir: The directory to save the results to. Optimization state and results will be saved to this directory. If the directory already exists, GEPA will read the state from this directory and resume the optimization from the last saved state. If provided, a FileStopper is automatically created which checks for the presence of "gepa.stop" in this directory, allowing graceful stopping of the optimization process upon its presence.
     - use_weave: Whether to use wandb weave for experiment tracking and LLM call tracing. When enabled, weave auto-patches litellm for tracing.
-    - weave_project_name: The project name to use for wandb weave. Defaults to 'gepa-optimization'.
+    - weave_project_name: The project name to use for wandb weave. Defaults to 'gepa-boost'.
     - track_best_outputs: Whether to track the best outputs on the validation set. If True, GEPAResult will contain the best outputs obtained for each task in the validation set.
     - display_progress_bar: Show a tqdm progress bar over metric calls when enabled.
     - use_cloudpickle: Use cloudpickle instead of pickle. This can be helpful when the serialized state contains dynamically generated DSPy signatures.
@@ -164,14 +163,6 @@ def optimize(
     - val_evaluation_policy: Strategy controlling which validation ids to score each iteration and which candidate is currently best. Supported strings: "full_eval" (evaluate every id each time) Passing None defaults to "full_eval".
     - raise_on_exception: Whether to propagate proposer/evaluator exceptions instead of stopping gracefully.
     """
-    # Configure LiteLLM disk cache
-    if litellm_cache:
-        import litellm
-        from litellm import Cache
-
-        cache_dir = os.path.expanduser("~/.cache/litellm")
-        litellm.cache = Cache(type="disk", disk_cache_dir=cache_dir)
-
     # Validate seed_candidate is not None or empty
     if seed_candidate is None or not seed_candidate:
         raise ValueError("seed_candidate must contain at least one component text.")
@@ -245,6 +236,7 @@ def optimize(
 
         reflection_lm_name = reflection_lm
 
+        @weave_op("gepa.reflection_lm")
         def _reflection_lm(prompt: str) -> str:
             completion = litellm.completion(
                 model=reflection_lm_name,

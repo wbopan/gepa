@@ -372,9 +372,7 @@ class GEPAEngine(Generic[DataId, DataInst, Trajectory, RolloutOutput]):
         seed_valset_evaluation = ValsetEvaluation(
             outputs_by_val_id={},  # outputs not tracked at initialization
             scores_by_val_id=dict(seed_scores),
-            objective_scores_by_val_id=(
-                dict(state.prog_candidate_objective_scores[0]) if state.prog_candidate_objective_scores[0] else None
-            ),
+            objective_scores_by_val_id=None,  # Per-val-id objective scores not available at seed initialization
         )
         log_detailed_metrics_after_discovering_new_program(
             logger=self.logger,

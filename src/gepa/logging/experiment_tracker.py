@@ -27,8 +27,14 @@ class ExperimentTracker:
         """Initialize weave and start wandb run."""
         if self.use_weave:
             try:
-                import wandb
+                import os
+
+                # Suppress weave trace URL printing by default
+                os.environ.setdefault("WEAVE_PRINT_CALL_LINK", "false")
+
                 import weave  # noqa: F401 weave auto-patches litellm when imported with wandb
+
+                import wandb
 
                 wandb.login()
                 wandb.init(project=self.weave_project_name)

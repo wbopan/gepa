@@ -95,7 +95,6 @@ def log_detailed_metrics_after_discovering_new_program(
     logger.log(f"Iteration {gepa_state.i + 1}: New program candidate index: {new_program_idx}", header="iter")
 
     metrics = {
-        "iteration": gepa_state.i + 1,
         "new_program_idx": new_program_idx,
         "valset_pareto_front_agg": pareto_avg,
         "valset_pareto_front_programs": {k: list(v) for k, v in gepa_state.program_at_pareto_front_valset.items()},
@@ -127,7 +126,7 @@ def log_detailed_metrics_after_discovering_new_program(
             k: list(v) for k, v in gepa_state.program_at_pareto_front_objectives.items()
         }
 
-    experiment_tracker.log_metrics(metrics, step=gepa_state.i + 1)
+    experiment_tracker.log_metrics(metrics, step=gepa_state.i)
 
     # Log artifacts for accepted candidates
     parent_idx = None

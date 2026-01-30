@@ -130,6 +130,22 @@ class AdaBoostBatchSampler(BatchSampler[DataId, DataInst]):
         weights = [self._weights.get(data_id, 1.0) for data_id in self._last_sampled_ids]
         return sum(weights) / len(weights)
 
+    def get_train_sample_weight_stats(self) -> dict[str, float] | None:
+        """Return weight statistics for all training samples.
+
+        Returns:
+            Dict with train_sample_weight_avg, train_sample_weight_max, train_sample_weight_min,
+            or None if no weights initialized yet.
+        """
+        if not self._weights:
+            return None
+        weights = list(self._weights.values())
+        return {
+            "train_sample_weight_avg": sum(weights) / len(weights),
+            "train_sample_weight_max": max(weights),
+            "train_sample_weight_min": min(weights),
+        }
+
 
 @dataclass
 class PAdaBoostBatchSampler(BatchSampler[DataId, DataInst]):
@@ -277,6 +293,22 @@ class PAdaBoostBatchSampler(BatchSampler[DataId, DataInst]):
         weights = [self._weights.get(data_id, 1.0) for data_id in self._last_sampled_ids]
         return sum(weights) / len(weights)
 
+    def get_train_sample_weight_stats(self) -> dict[str, float] | None:
+        """Return weight statistics for all training samples.
+
+        Returns:
+            Dict with train_sample_weight_avg, train_sample_weight_max, train_sample_weight_min,
+            or None if no weights initialized yet.
+        """
+        if not self._weights:
+            return None
+        all_weights = list(self._weights.values())
+        return {
+            "train_sample_weight_avg": sum(all_weights) / len(all_weights),
+            "train_sample_weight_max": max(all_weights),
+            "train_sample_weight_min": min(all_weights),
+        }
+
 
 @dataclass
 class PMaxBatchSampler(BatchSampler[DataId, DataInst]):
@@ -418,3 +450,19 @@ class PMaxBatchSampler(BatchSampler[DataId, DataInst]):
             return 1.0
         weights = [self._weights.get(data_id, 1.0) for data_id in self._last_sampled_ids]
         return sum(weights) / len(weights)
+
+    def get_train_sample_weight_stats(self) -> dict[str, float] | None:
+        """Return weight statistics for all training samples.
+
+        Returns:
+            Dict with train_sample_weight_avg, train_sample_weight_max, train_sample_weight_min,
+            or None if no weights initialized yet.
+        """
+        if not self._weights:
+            return None
+        all_weights = list(self._weights.values())
+        return {
+            "train_sample_weight_avg": sum(all_weights) / len(all_weights),
+            "train_sample_weight_max": max(all_weights),
+            "train_sample_weight_min": min(all_weights),
+        }

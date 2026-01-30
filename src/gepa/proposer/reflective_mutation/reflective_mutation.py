@@ -138,6 +138,10 @@ class ReflectiveMutationProposer(ProposeNewCandidate[DataId]):
         if hasattr(self.batch_sampler, "get_last_sampled_avg_weight"):
             avg_weight = self.batch_sampler.get_last_sampled_avg_weight()
             self.experiment_tracker.log_metrics({"sampled_avg_weight": avg_weight}, iteration=state.i)
+        if hasattr(self.batch_sampler, "get_train_sample_weight_stats"):
+            weight_stats = self.batch_sampler.get_train_sample_weight_stats()
+            if weight_stats:
+                self.experiment_tracker.log_metrics(weight_stats, iteration=state.i)
 
         # Notify minibatch sampled
         notify_callbacks(

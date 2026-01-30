@@ -587,6 +587,16 @@ class GEPAEngine(Generic[DataId, DataInst, Trajectory, RolloutOutput]):
             ),
         )
 
+        # Log final results to MLflow artifacts
+        best_score = self.val_evaluation_policy.get_valset_score(best_candidate_idx, state)
+        self.experiment_tracker.log_final_results(
+            best_candidate=state.program_candidates[best_candidate_idx],
+            best_candidate_idx=best_candidate_idx,
+            best_score=best_score,
+            total_candidates=len(state.program_candidates),
+            total_metric_calls=state.total_num_evals,
+        )
+
         return state
 
     def _should_stop(self, state: GEPAState[RolloutOutput, DataId]) -> bool:

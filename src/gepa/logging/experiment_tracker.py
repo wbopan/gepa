@@ -154,6 +154,98 @@ class ExperimentTracker:
 
         return False
 
+    def log_prompt_artifact(
+        self,
+        prompt: dict[str, str],
+        candidate_idx: int,
+        iteration: int,
+        is_best: bool = False,
+        parent_idx: int | None = None,
+        valset_score: float | None = None,
+    ) -> None:
+        """Save candidate prompt as a text artifact."""
+        if not self.use_mlflow:
+            return
+        try:
+            import mlflow
+
+            lines = [f"# Candidate {candidate_idx} - Iteration {iteration}"]
+            if parent_idx is not None:
+                lines.append(f"# Parent: Candidate {parent_idx}")
+            if valset_score is not None:
+                lines.append(f"# Valset Score: {valset_score:.4f}")
+            lines.append("")
+
+            for component_name, component_text in prompt.items():
+                lines.append(f"## {component_name}")
+                lines.append(component_text)
+                lines.append("")
+
+            filename = "prompts/best_prompt.txt" if is_best else f"prompts/candidate_{candidate_idx:03d}.txt"
+            mlflow.log_text("\n".join(lines), filename)
+        except Exception as e:
+            print(f"Warning: Failed to log prompt artifact: {e}")
+
+    def log_score_distribution(
+        self,
+        scores_by_val_id: dict,
+        candidate_idx: int,
+        iteration: int,
+        objective_scores: dict | None = None,
+    ) -> None:
+        """Save per-example raw scores as a JSON artifact."""
+        if not self.use_mlflow:
+            return
+        try:
+            import mlflow
+
+            data = {
+                "candidate_idx": candidate_idx,
+                "iteration": iteration,
+                "num_examples": len(scores_by_val_id),
+                "scores_by_val_id": {str(k): v for k, v in scores_by_val_id.items()},
+            }
+            if objective_scores:
+                data["objective_scores"] = dict(objective_scores)
+
+            mlflow.log_dict(data, f"scores/candidate_{candidate_idx:03d}.json")
+        except Exception as e:
+            print(f"Warning: Failed to log score distribution: {e}")
+
+    def log_final_results(
+        self,
+        best_candidate: dict[str, str],
+        best_candidate_idx: int,
+        best_score: float,
+        total_candidates: int,
+        total_metric_calls: int,
+    ) -> None:
+        """Save final optimization results."""
+        if not self.use_mlflow:
+            return
+        try:
+            import mlflow
+
+            # Save best prompt
+            self.log_prompt_artifact(
+                prompt=best_candidate,
+                candidate_idx=best_candidate_idx,
+                iteration=-1,
+                is_best=True,
+                valset_score=best_score,
+            )
+
+            # Save summary
+            summary = {
+                "best_candidate_idx": best_candidate_idx,
+                "best_score": best_score,
+                "total_candidates": total_candidates,
+                "total_metric_calls": total_metric_calls,
+            }
+            mlflow.log_dict(summary, "final_summary.json")
+        except Exception as e:
+            print(f"Warning: Failed to log final results: {e}")
+
 
 def create_experiment_tracker(
     use_wandb: bool = False,

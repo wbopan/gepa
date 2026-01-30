@@ -89,7 +89,7 @@ class DefaultAdapter(GEPAAdapter[DefaultDataInst, DefaultTrajectory, DefaultRoll
         self,
         model: str | ChatCompletionCallable,
         evaluator: Evaluator | None = None,
-        max_litellm_workers: int = 10,
+        max_litellm_workers: int = 50,
         litellm_batch_completion_kwargs: dict[str, Any] | None = None,
     ):
         if isinstance(model, str):
@@ -127,15 +127,24 @@ class DefaultAdapter(GEPAAdapter[DefaultDataInst, DefaultTrajectory, DefaultRoll
             litellm_requests.append(messages)
 
         if isinstance(self.model, str):
-            responses = [
-                resp.choices[0].message.content.strip()
-                for resp in self.litellm.batch_completion(
-                    model=self.model,
-                    messages=litellm_requests,
-                    max_workers=self.max_litellm_workers,
-                    **self.litellm_batch_completion_kwargs,
-                )
-            ]
+            raw_responses = self.litellm.batch_completion(
+                model=self.model,
+                messages=litellm_requests,
+                max_workers=self.max_litellm_workers,
+                num_retries=5,
+                caching=True,  # Enable litellm cache when litellm.cache is set
+                **self.litellm_batch_completion_kwargs,
+            )
+            responses = []
+            for i, resp in enumerate(raw_responses):
+                if isinstance(resp, Exception):
+                    print(f"[DEBUG] API call failed for request {i}")
+                    print(f"[DEBUG] Exception type: {type(resp).__name__}")
+                    print(f"[DEBUG] Exception message: {resp}")
+                    print(f"[DEBUG] Request messages: {litellm_requests[i]}")
+                    import ipdb; ipdb.set_trace()  # Breakpoint for debugging
+                    raise resp
+                responses.append(resp.choices[0].message.content.strip())
         else:
             responses = [self.model(messages) for messages in litellm_requests]
 

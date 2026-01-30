@@ -102,3 +102,25 @@ def log_detailed_metrics_after_discovering_new_program(
         }
 
     experiment_tracker.log_metrics(metrics, step=gepa_state.i + 1)
+
+    # Log artifacts for accepted candidates
+    parent_idx = None
+    parents = gepa_state.parent_program_for_candidate[new_program_idx]
+    if parents:
+        parent_idx = parents[0]
+
+    experiment_tracker.log_prompt_artifact(
+        prompt=gepa_state.program_candidates[new_program_idx],
+        candidate_idx=new_program_idx,
+        iteration=gepa_state.i + 1,
+        is_best=(new_program_idx == linear_pareto_front_program_idx),
+        parent_idx=parent_idx,
+        valset_score=valset_score,
+    )
+
+    experiment_tracker.log_score_distribution(
+        scores_by_val_id=dict(valset_scores),
+        candidate_idx=new_program_idx,
+        iteration=gepa_state.i + 1,
+        objective_scores=objective_scores,
+    )

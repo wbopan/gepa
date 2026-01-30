@@ -82,6 +82,8 @@ def optimize(
     seed: int = 0,
     raise_on_exception: bool = True,
     val_evaluation_policy: EvaluationPolicy[DataId, DataInst] | Literal["full_eval"] | None = None,
+    # LiteLLM configuration
+    litellm_cache: bool = True,
 ) -> GEPAResult[RolloutOutput, DataId]:
     """
     GEPA is an evolutionary optimizer that evolves (multiple) text components of a complex system to optimize them towards a given metric.
@@ -156,6 +158,7 @@ def optimize(
     - wandb_api_key: The API key to use for Weights and Biases.
     - wandb_init_kwargs: Additional keyword arguments to pass to the Weights and Biases initialization.
     - use_mlflow: Whether to use MLflow to log the progress of the optimization.
+      When enabled, this also enables LiteLLM's MLflow tracing for LLM call tracking.
       Both wandb and mlflow can be used simultaneously if desired.
     - mlflow_tracking_uri: The tracking URI to use for MLflow.
     - mlflow_experiment_name: The experiment name to use for MLflow.
@@ -171,6 +174,21 @@ def optimize(
     - val_evaluation_policy: Strategy controlling which validation ids to score each iteration and which candidate is currently best. Supported strings: "full_eval" (evaluate every id each time) Passing None defaults to "full_eval".
     - raise_on_exception: Whether to propagate proposer/evaluator exceptions instead of stopping gracefully.
     """
+    # Configure LiteLLM disk cache
+    if litellm_cache:
+        import litellm
+        from litellm import Cache
+
+        cache_dir = os.path.expanduser("~/.cache/litellm")
+        litellm.cache = Cache(type="disk", disk_cache_dir=cache_dir)
+
+    # Configure LiteLLM MLflow tracing when use_mlflow is enabled
+    if use_mlflow:
+        import litellm
+
+        if "mlflow" not in litellm.callbacks:
+            litellm.callbacks.append("mlflow")
+
     # Validate seed_candidate is not None or empty
     if seed_candidate is None or not seed_candidate:
         raise ValueError("seed_candidate must contain at least one component text.")
@@ -245,7 +263,11 @@ def optimize(
         reflection_lm_name = reflection_lm
 
         def _reflection_lm(prompt: str) -> str:
-            completion = litellm.completion(model=reflection_lm_name, messages=[{"role": "user", "content": prompt}])
+            completion = litellm.completion(
+                model=reflection_lm_name,
+                messages=[{"role": "user", "content": prompt}],
+                num_retries=5,
+            )
             return completion.choices[0].message.content  # type: ignore
 
         reflection_lm = _reflection_lm

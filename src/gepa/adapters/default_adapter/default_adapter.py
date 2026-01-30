@@ -141,13 +141,6 @@ class DefaultAdapter(GEPAAdapter[DefaultDataInst, DefaultTrajectory, DefaultRoll
             responses = []
             for i, resp in enumerate(raw_responses):
                 if isinstance(resp, Exception):
-                    print(f"[DEBUG] API call failed for request {i}")
-                    print(f"[DEBUG] Exception type: {type(resp).__name__}")
-                    print(f"[DEBUG] Exception message: {resp}")
-                    print(f"[DEBUG] Request messages: {litellm_requests[i]}")
-                    import ipdb
-
-                    ipdb.set_trace()  # Breakpoint for debugging
                     raise resp
                 responses.append(resp.choices[0].message.content.strip())
         else:

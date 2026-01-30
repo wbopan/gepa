@@ -4,6 +4,8 @@
 from collections.abc import Mapping, Sequence
 from typing import Any
 
+import weave
+
 from gepa.core.adapter import DataInst, GEPAAdapter, RolloutOutput, Trajectory
 from gepa.core.callbacks import (
     CandidateSelectedEvent,
@@ -19,7 +21,7 @@ from gepa.core.callbacks import (
 )
 from gepa.core.data_loader import DataId, DataLoader, ensure_loader
 from gepa.core.state import GEPAState
-from gepa.logging.weave_tracing import add_call_feedback, weave_op
+from gepa.logging.weave_tracing import add_call_feedback
 from gepa.proposer.base import CandidateProposal, ProposeNewCandidate
 from gepa.proposer.reflective_mutation.base import (
     CandidateSelector,
@@ -72,14 +74,6 @@ class ReflectiveMutationProposer(ProposeNewCandidate[DataId]):
         InstructionProposalSignature.validate_prompt_template(reflection_prompt_template)
         self.reflection_prompt_template = reflection_prompt_template
 
-    @weave_op("gepa.propose.reflective_mutation.evaluate_current")
-    def _evaluate_current(self, minibatch: list[DataInst], candidate: dict[str, str], capture_traces: bool):
-        return self.adapter.evaluate(minibatch, candidate, capture_traces=capture_traces)
-
-    @weave_op("gepa.propose.reflective_mutation.evaluate_proposed")
-    def _evaluate_proposed(self, state: GEPAState, candidate: dict[str, str], subsample_ids, fetcher, evaluator):
-        return state.cached_evaluate_full(candidate, subsample_ids, fetcher, evaluator)
-
     def propose_new_texts(
         self,
         candidate: dict[str, str],
@@ -110,7 +104,7 @@ class ReflectiveMutationProposer(ProposeNewCandidate[DataId]):
             )["new_instruction"]
         return new_texts
 
-    @weave_op("gepa.propose.reflective_mutation")
+    @weave.op(name="gepa.propose.reflective_mutation")
     def propose(self, state: GEPAState) -> CandidateProposal | None:
         i = state.i + 1
 
@@ -134,10 +128,7 @@ class ReflectiveMutationProposer(ProposeNewCandidate[DataId]):
             ),
         )
 
-        self.experiment_tracker.log_metrics(
-            {"selected_program_candidate": curr_prog_id, "iteration": i},
-            step=state.total_num_evals,
-        )
+        self.experiment_tracker.log_metrics({"selected_program_candidate": curr_prog_id}, iteration=state.i)
 
         subsample_ids = self.batch_sampler.next_minibatch_ids(self.trainset, state)
         state.full_program_trace[-1]["subsample_ids"] = subsample_ids
@@ -146,11 +137,7 @@ class ReflectiveMutationProposer(ProposeNewCandidate[DataId]):
         # Log AdaBoost sampler average weight if applicable
         if hasattr(self.batch_sampler, "get_last_sampled_avg_weight"):
             avg_weight = self.batch_sampler.get_last_sampled_avg_weight()
-            self.experiment_tracker.log_metrics(
-                {"sampled_avg_weight": avg_weight},
-                step=state.total_num_evals,
-                commit=False,
-            )
+            self.experiment_tracker.log_metrics({"sampled_avg_weight": avg_weight}, iteration=state.i)
 
         # Notify minibatch sampled
         notify_callbacks(
@@ -180,7 +167,7 @@ class ReflectiveMutationProposer(ProposeNewCandidate[DataId]):
                 is_seed_candidate=is_seed_candidate,
             ),
         )
-        eval_curr = self._evaluate_current(minibatch, curr_prog, capture_traces=True)
+        eval_curr = self.adapter.evaluate(minibatch, curr_prog, capture_traces=True)
         state.increment_evals(len(subsample_ids))
         state.full_program_trace[-1]["subsample_scores"] = eval_curr.scores
         notify_callbacks(
@@ -236,9 +223,7 @@ class ReflectiveMutationProposer(ProposeNewCandidate[DataId]):
             )
             return None
 
-        self.experiment_tracker.log_metrics(
-            {"subsample_score": sum(eval_curr.scores), "iteration": i}, step=state.total_num_evals
-        )
+        self.experiment_tracker.log_metrics({"subsample_score": sum(eval_curr.scores)}, iteration=state.i)
 
         # 2) Decide which predictors to update
         predictor_names_to_update = self.module_selector(
@@ -328,8 +313,8 @@ class ReflectiveMutationProposer(ProposeNewCandidate[DataId]):
             ),
         )
 
-        outputs_by_id, scores_by_id, objective_by_id, actual_evals_count = self._evaluate_proposed(
-            state, new_candidate, subsample_ids, self.trainset.fetch, evaluator
+        outputs_by_id, scores_by_id, objective_by_id, actual_evals_count = state.cached_evaluate_full(
+            new_candidate, subsample_ids, self.trainset.fetch, evaluator
         )
         new_scores = [scores_by_id[eid] for eid in subsample_ids]
         outputs = [outputs_by_id[eid] for eid in subsample_ids]
@@ -354,9 +339,7 @@ class ReflectiveMutationProposer(ProposeNewCandidate[DataId]):
         state.full_program_trace[-1]["new_subsample_scores"] = new_scores
 
         new_sum = sum(new_scores)
-        self.experiment_tracker.log_metrics(
-            {"new_subsample_score": new_sum, "iteration": i}, step=state.total_num_evals
-        )
+        self.experiment_tracker.log_metrics({"new_subsample_score": new_sum}, iteration=state.i)
 
         # Add feedback with subsample scores
         add_call_feedback(

@@ -852,6 +852,7 @@ dependencies = [
     { name = "litellm" },
     { name = "rich" },
     { name = "tenacity" },
+    { name = "weave", extra = ["litellm"] },
 ]
 
 [package.optional-dependencies]
@@ -881,7 +882,6 @@ dev = [
     { name = "tiktoken", marker = "python_full_version >= '3.14'" },
     { name = "tqdm" },
     { name = "twine" },
-    { name = "weave", extra = ["litellm"] },
     { name = "wheel" },
 ]
 full = [
@@ -891,7 +891,6 @@ full = [
     { name = "pydantic", marker = "python_full_version >= '3.14'" },
     { name = "tiktoken", marker = "python_full_version >= '3.14'" },
     { name = "tqdm" },
-    { name = "weave", extra = ["litellm"] },
 ]
 test = [
     { name = "datasets" },
@@ -902,7 +901,6 @@ test = [
     { name = "pytest" },
     { name = "tiktoken", marker = "python_full_version >= '3.14'" },
     { name = "tqdm" },
-    { name = "weave", extra = ["litellm"] },
 ]
 
 [package.metadata]
@@ -932,8 +930,7 @@ requires-dist = [
     { name = "tiktoken", marker = "python_full_version >= '3.14' and extra == 'full'", specifier = ">=0.12.0" },
     { name = "tqdm", marker = "extra == 'full'", specifier = ">=4.66.1" },
     { name = "twine", marker = "extra == 'build'" },
-    { name = "weave", extras = ["litellm"], marker = "python_full_version >= '3.14' and extra == 'full'", specifier = ">=0.51.0" },
-    { name = "weave", extras = ["litellm"], marker = "python_full_version < '3.14' and extra == 'full'" },
+    { name = "weave", extras = ["litellm"], specifier = ">=0.51.0" },
     { name = "wheel", marker = "extra == 'build'" },
 ]
 provides-extras = ["full", "dspy", "test", "build", "dev"]

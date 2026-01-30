@@ -5,6 +5,8 @@ import traceback
 from collections.abc import Sequence
 from typing import Generic
 
+import weave
+
 from gepa.core.adapter import DataInst, GEPAAdapter, RolloutOutput, Trajectory
 from gepa.core.callbacks import (
     BudgetUpdatedEvent,
@@ -28,8 +30,8 @@ from gepa.core.data_loader import DataId, DataLoader, ensure_loader
 from gepa.core.state import EvaluationCache, FrontierType, GEPAState, ValsetEvaluation, initialize_gepa_state
 from gepa.logging.experiment_tracker import ExperimentTracker
 from gepa.logging.logger import LoggerProtocol
-from gepa.logging.utils import log_detailed_metrics_after_discovering_new_program
-from gepa.logging.weave_tracing import add_call_feedback, weave_op
+from gepa.logging.utils import log_detailed_metrics_after_discovering_new_program, log_iteration_metrics
+from gepa.logging.weave_tracing import add_call_feedback
 from gepa.proposer.merge import MergeProposer
 from gepa.proposer.reflective_mutation.reflective_mutation import (
     ReflectiveMutationProposer,
@@ -236,7 +238,7 @@ class GEPAEngine(Generic[DataId, DataInst, Trajectory, RolloutOutput]):
         )
         return new_program_idx, linear_pareto_front_program_idx
 
-    @weave_op("gepa.optimization")
+    @weave.op(name="gepa.optimization")
     def run(self) -> GEPAState[RolloutOutput, DataId]:
         # Check tqdm availability if progress bar is enabled
         progress_bar = None
@@ -361,6 +363,29 @@ class GEPAEngine(Generic[DataId, DataInst, Trajectory, RolloutOutput]):
             accepted=True,
             candidate_idx=0,
             valset_score=base_val_avg,
+        )
+
+        # Log initial metrics for iteration 0 (base program)
+        log_iteration_metrics(state, self.experiment_tracker, self.val_evaluation_policy)
+
+        # Log detailed metrics for seed program
+        seed_valset_evaluation = ValsetEvaluation(
+            outputs_by_val_id={},  # outputs not tracked at initialization
+            scores_by_val_id=dict(seed_scores),
+            objective_scores_by_val_id=(
+                dict(state.prog_candidate_objective_scores[0]) if state.prog_candidate_objective_scores[0] else None
+            ),
+        )
+        log_detailed_metrics_after_discovering_new_program(
+            logger=self.logger,
+            gepa_state=state,
+            new_program_idx=0,
+            valset_evaluation=seed_valset_evaluation,
+            objective_scores=state.prog_candidate_objective_scores[0],
+            experiment_tracker=self.experiment_tracker,
+            linear_pareto_front_program_idx=0,
+            valset_size=len(valset),
+            val_evaluation_policy=self.val_evaluation_policy,
         )
 
         # Register budget hook to fire on_budget_updated callback in real-time
@@ -606,6 +631,9 @@ class GEPAEngine(Generic[DataId, DataInst, Trajectory, RolloutOutput]):
                 # Notify iteration end only if the iteration actually started
                 # (i.e., on_iteration_start was called successfully)
                 if iteration_started:
+                    # Log metrics for every iteration
+                    log_iteration_metrics(state, self.experiment_tracker, self.val_evaluation_policy)
+
                     notify_callbacks(
                         self.callbacks,
                         "on_iteration_end",

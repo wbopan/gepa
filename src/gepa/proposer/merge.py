@@ -6,6 +6,8 @@ import random
 from collections.abc import Callable, Iterable, Sequence
 from copy import deepcopy
 
+import weave
+
 from gepa.core.adapter import Candidate, DataInst, RolloutOutput
 from gepa.core.callbacks import (
     EvaluationEndEvent,
@@ -17,7 +19,7 @@ from gepa.core.data_loader import DataId, DataLoader
 from gepa.core.state import GEPAState, ObjectiveScores, ProgramIdx
 from gepa.gepa_utils import find_dominator_programs
 from gepa.logging.logger import LoggerProtocol
-from gepa.logging.weave_tracing import add_call_feedback, weave_op
+from gepa.logging.weave_tracing import add_call_feedback
 from gepa.proposer.base import CandidateProposal, ProposeNewCandidate
 
 AncestorLog = tuple[int, int, int]
@@ -288,7 +290,7 @@ class MergeProposer(ProposeNewCandidate[DataId]):
 
         return selected[:num_subsample_ids]
 
-    @weave_op("gepa.propose.merge")
+    @weave.op(name="gepa.propose.merge")
     def propose(self, state: GEPAState[RolloutOutput, DataId]) -> CandidateProposal[DataId] | None:
         i = state.i + 1
         state.full_program_trace[-1]["invoked_merge"] = True

@@ -3,72 +3,26 @@
 
 """Tests for weave tracing utilities."""
 
-from gepa.logging.weave_tracing import (
-    add_call_feedback,
-    configure_weave_tracing,
-    is_weave_tracing_enabled,
-    weave_op,
-)
+import weave
 
-
-class TestConfigureWeaveTracing:
-    """Tests for configure_weave_tracing function."""
-
-    def test_enable_tracing(self):
-        """Test enabling weave tracing."""
-        configure_weave_tracing(enabled=True, client=None)
-        assert is_weave_tracing_enabled() is True
-
-        # Cleanup
-        configure_weave_tracing(enabled=False, client=None)
-
-    def test_disable_tracing(self):
-        """Test disabling weave tracing."""
-        configure_weave_tracing(enabled=False, client=None)
-        assert is_weave_tracing_enabled() is False
-
-    def test_toggle_tracing(self):
-        """Test toggling weave tracing on and off."""
-        configure_weave_tracing(enabled=True, client=None)
-        assert is_weave_tracing_enabled() is True
-
-        configure_weave_tracing(enabled=False, client=None)
-        assert is_weave_tracing_enabled() is False
+from gepa.logging.weave_tracing import add_call_feedback, weave_op
 
 
 class TestWeaveOp:
-    """Tests for weave_op decorator."""
+    """Tests for weave_op (which is now just weave.op)."""
 
-    def setup_method(self):
-        """Ensure tracing is disabled before each test."""
-        configure_weave_tracing(enabled=False, client=None)
-
-    def teardown_method(self):
-        """Cleanup after each test."""
-        configure_weave_tracing(enabled=False, client=None)
-
-    def test_weave_op_disabled_passes_through(self):
-        """Test that weave_op is a no-op when tracing is disabled."""
-        call_count = 0
-
-        @weave_op("test.operation")
-        def test_function(x, y):
-            nonlocal call_count
-            call_count += 1
-            return x + y
-
-        result = test_function(1, 2)
-        assert result == 3
-        assert call_count == 1
+    def test_weave_op_is_weave_op(self):
+        """Test that weave_op is the same as weave.op."""
+        assert weave_op is weave.op
 
     def test_weave_op_preserves_function_behavior(self):
         """Test that decorated function behaves correctly."""
 
-        @weave_op("test.add")
+        @weave_op(name="test.add")
         def add(a, b):
             return a + b
 
-        @weave_op("test.multiply")
+        @weave_op(name="test.multiply")
         def multiply(a, b):
             return a * b
 
@@ -78,7 +32,7 @@ class TestWeaveOp:
     def test_weave_op_with_kwargs(self):
         """Test weave_op with keyword arguments."""
 
-        @weave_op("test.greet")
+        @weave_op(name="test.greet")
         def greet(name, greeting="Hello"):
             return f"{greeting}, {name}!"
 
@@ -98,16 +52,8 @@ class TestWeaveOp:
 class TestAddCallFeedback:
     """Tests for add_call_feedback function."""
 
-    def setup_method(self):
-        """Ensure tracing is disabled before each test."""
-        configure_weave_tracing(enabled=False, client=None)
-
-    def teardown_method(self):
-        """Cleanup after each test."""
-        configure_weave_tracing(enabled=False, client=None)
-
-    def test_feedback_disabled_is_noop(self):
-        """Test that add_call_feedback is a no-op when tracing is disabled."""
+    def test_feedback_outside_call_is_noop(self):
+        """Test that add_call_feedback is a no-op when not in a weave call."""
         # Should not raise any errors
         add_call_feedback(score=0.5)
         add_call_feedback(scores={"accuracy": 0.9, "f1": 0.85})
@@ -124,29 +70,21 @@ class TestAddCallFeedback:
 class TestIntegration:
     """Integration tests combining multiple weave tracing features."""
 
-    def setup_method(self):
-        """Reset state before each test."""
-        configure_weave_tracing(enabled=False, client=None)
-
-    def teardown_method(self):
-        """Cleanup after each test."""
-        configure_weave_tracing(enabled=False, client=None)
-
     def test_multiple_decorated_calls(self):
         """Test multiple decorated function calls in sequence."""
         call_order = []
 
-        @weave_op("test.step1")
+        @weave_op(name="test.step1")
         def step1():
             call_order.append("step1")
             return 1
 
-        @weave_op("test.step2")
+        @weave_op(name="test.step2")
         def step2(x):
             call_order.append("step2")
             return x + 1
 
-        @weave_op("test.step3")
+        @weave_op(name="test.step3")
         def step3(x):
             call_order.append("step3")
             return x * 2

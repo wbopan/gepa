@@ -9,6 +9,8 @@ from typing import TYPE_CHECKING, Literal, cast
 if TYPE_CHECKING:
     from gepa.core.callbacks import GEPACallback
 
+import weave
+
 from gepa.adapters.default_adapter.default_adapter import (
     ChatCompletionCallable,
     DefaultAdapter,
@@ -21,7 +23,6 @@ from gepa.core.result import GEPAResult
 from gepa.core.state import EvaluationCache, FrontierType
 from gepa.logging.experiment_tracker import create_experiment_tracker
 from gepa.logging.logger import LoggerProtocol, get_logger
-from gepa.logging.weave_tracing import weave_op
 from gepa.proposer.merge import MergeProposer
 from gepa.proposer.reflective_mutation.base import CandidateSelector, LanguageModel, ReflectionComponentSelector
 from gepa.proposer.reflective_mutation.reflective_mutation import ReflectiveMutationProposer
@@ -238,7 +239,7 @@ def optimize(
 
         reflection_lm_name = reflection_lm
 
-        @weave_op("gepa.reflection_lm")
+        @weave.op(name="gepa.reflection_lm")
         def _reflection_lm(prompt: str) -> str:
             completion = litellm.completion(
                 model=reflection_lm_name,

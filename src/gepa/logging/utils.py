@@ -8,6 +8,34 @@ from gepa.core.state import GEPAState, ValsetEvaluation
 from gepa.strategies.eval_policy import EvaluationPolicy
 
 
+def log_iteration_metrics(
+    gepa_state: GEPAState,
+    experiment_tracker,
+    val_evaluation_policy: EvaluationPolicy[DataId, DataInst],
+):
+    """Log core metrics for every iteration, regardless of whether a new candidate was accepted."""
+    pareto_scores = list(gepa_state.pareto_front_valset.values())
+    if not pareto_scores or not all(score > float("-inf") for score in pareto_scores):
+        return
+
+    pareto_avg = sum(pareto_scores) / len(pareto_scores)
+    best_program_idx = val_evaluation_policy.get_best_program(gepa_state)
+    best_score = val_evaluation_policy.get_valset_score(best_program_idx, gepa_state)
+
+    metrics = {
+        "valset_pareto_front_agg": pareto_avg,
+        "best_valset_agg_score": best_score,
+        "best_program_idx": best_program_idx,
+        "num_candidates": len(gepa_state.program_candidates),
+    }
+
+    if gepa_state.objective_pareto_front:
+        objective_pareto_scores = list(gepa_state.objective_pareto_front.values())
+        metrics["objective_pareto_front_agg"] = sum(objective_pareto_scores) / len(objective_pareto_scores)
+
+    experiment_tracker.log_metrics(metrics, iteration=gepa_state.i)
+
+
 def log_detailed_metrics_after_discovering_new_program(
     logger,
     gepa_state: GEPAState,
@@ -94,15 +122,11 @@ def log_detailed_metrics_after_discovering_new_program(
     )
     logger.log(f"Iteration {gepa_state.i + 1}: New program candidate index: {new_program_idx}", header="iter")
 
+    # Only log new-program-specific metrics here; core metrics are logged by log_iteration_metrics
     metrics = {
-        "iteration": gepa_state.i + 1,
         "new_program_idx": new_program_idx,
-        "valset_pareto_front_agg": pareto_avg,
         "valset_pareto_front_programs": {k: list(v) for k, v in gepa_state.program_at_pareto_front_valset.items()},
-        "best_valset_agg_score": best_score_on_valset,
         "linear_pareto_front_program_idx": linear_pareto_front_program_idx,
-        "best_program_as_per_agg_score_valset": best_prog_per_agg_val_score,
-        "best_score_on_valset": best_score_on_valset,
         "val_evaluated_count_new_program": coverage,
         "val_total_count": valset_size,
         "val_program_average": valset_score,
@@ -126,4 +150,4 @@ def log_detailed_metrics_after_discovering_new_program(
             k: list(v) for k, v in gepa_state.program_at_pareto_front_objectives.items()
         }
 
-    experiment_tracker.log_metrics(metrics, step=gepa_state.total_num_evals)
+    experiment_tracker.log_metrics(metrics, iteration=gepa_state.i)

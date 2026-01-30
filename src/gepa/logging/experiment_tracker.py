@@ -1,9 +1,10 @@
 # Copyright (c) 2025 Lakshya A Agrawal and the GEPA contributors
 # https://github.com/gepa-ai/gepa
 
+import os
 from typing import Any
 
-from gepa.logging.weave_tracing import configure_weave_tracing
+import weave
 
 
 class ExperimentTracker:
@@ -29,40 +30,39 @@ class ExperimentTracker:
     def start_run(self):
         """Initialize weave and start wandb run."""
         if self.use_weave:
-            try:
-                import os
+            import wandb
 
-                # Suppress weave trace URL printing by default
-                os.environ.setdefault("WEAVE_PRINT_CALL_LINK", "false")
+            # Suppress weave trace URL printing by default
+            os.environ.setdefault("WEAVE_PRINT_CALL_LINK", "false")
 
-                import weave
+            wandb.login()
+            wandb.init(project=self.weave_project_name)
 
-                import wandb
+            # Configure wandb to group metrics by gepa_iteration field
+            wandb.define_metric("gepa_iteration")
+            wandb.define_metric("*", step_metric="gepa_iteration")
 
-                wandb.login()
-                wandb.init(project=self.weave_project_name)
+            # Initialize weave with tracing enabled
+            weave.init(project_name=self.weave_project_name)
+        else:
+            # Initialize weave with tracing disabled
+            weave.init(project_name=self.weave_project_name, settings={"disabled": True})
 
-                # Configure weave tracing for hierarchical call organization
-                configure_weave_tracing(enabled=True, client=weave)
-            except ImportError:
-                raise ImportError("weave is not installed. Install with: pip install 'weave[litellm]'")
-
-    def log_metrics(self, metrics: dict[str, Any], step: int | None = None, commit: bool = True):
+    def log_metrics(self, metrics: dict[str, Any], iteration: int | None = None):
         """Log time-series metrics to wandb.
 
         Args:
             metrics: Dictionary of metric name to value.
-            step: The step number for this log entry.
-            commit: If True (default), finalize this step. If False, allow additional
-                   metrics to be logged at the same step before committing.
-                   Use commit=False when logging multiple metrics at the same step,
-                   then commit=True on the final log call for that step.
+            iteration: The GEPA iteration number. When provided, all metrics logged
+                      with the same iteration value will be grouped together in wandb.
         """
         if self.use_weave:
             try:
                 import wandb
 
-                wandb.log(metrics, step=step, commit=commit)
+                if iteration is not None:
+                    metrics = {**metrics, "gepa_iteration": iteration}
+                wandb.log(metrics)
             except Exception as e:
                 print(f"Warning: Failed to log metrics: {e}")
 
@@ -82,9 +82,6 @@ class ExperimentTracker:
         if self.use_weave:
             try:
                 import wandb
-
-                # Disable weave tracing
-                configure_weave_tracing(enabled=False, client=None)
 
                 if wandb.run is not None:
                     wandb.finish()
@@ -117,8 +114,6 @@ class ExperimentTracker:
         if not self.use_weave:
             return None
         try:
-            import weave
-
             from gepa.logging.prompt_tracker import GEPAPrompt
 
             prompt = GEPAPrompt(

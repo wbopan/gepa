@@ -4,6 +4,8 @@
 from collections.abc import Mapping, Sequence
 from typing import Any, NamedTuple, Protocol, TypedDict, cast
 
+import weave
+
 from gepa.core.adapter import EvaluationBatch, GEPAAdapter
 
 
@@ -101,6 +103,7 @@ class DefaultAdapter(GEPAAdapter[DefaultDataInst, DefaultTrajectory, DefaultRoll
         self.max_litellm_workers = max_litellm_workers
         self.litellm_batch_completion_kwargs = litellm_batch_completion_kwargs or {}
 
+    @weave.op(name="gepa.adapter.evaluate")
     def evaluate(
         self,
         batch: list[DefaultDataInst],
@@ -142,7 +145,9 @@ class DefaultAdapter(GEPAAdapter[DefaultDataInst, DefaultTrajectory, DefaultRoll
                     print(f"[DEBUG] Exception type: {type(resp).__name__}")
                     print(f"[DEBUG] Exception message: {resp}")
                     print(f"[DEBUG] Request messages: {litellm_requests[i]}")
-                    import ipdb; ipdb.set_trace()  # Breakpoint for debugging
+                    import ipdb
+
+                    ipdb.set_trace()  # Breakpoint for debugging
                     raise resp
                 responses.append(resp.choices[0].message.content.strip())
         else:

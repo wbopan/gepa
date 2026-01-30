@@ -42,7 +42,7 @@ class ExperimentTracker:
                 raise ImportError("weave is not installed. Install with: pip install 'weave[litellm]'")
 
     def log_metrics(self, metrics: dict[str, Any], step: int | None = None):
-        """Log metrics to wandb."""
+        """Log time-series metrics to wandb."""
         if self.use_weave:
             try:
                 import wandb
@@ -50,6 +50,17 @@ class ExperimentTracker:
                 wandb.log(metrics, step=step)
             except Exception as e:
                 print(f"Warning: Failed to log metrics: {e}")
+
+    def log_summary(self, metrics: dict[str, Any]):
+        """Log one-time summary metrics to wandb."""
+        if self.use_weave:
+            try:
+                import wandb
+
+                for key, value in metrics.items():
+                    wandb.summary[key] = value
+            except Exception as e:
+                print(f"Warning: Failed to log summary: {e}")
 
     def end_run(self):
         """End the wandb run."""

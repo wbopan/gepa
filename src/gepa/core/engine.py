@@ -195,7 +195,10 @@ class GEPAEngine(Generic[DataId, DataInst, Trajectory, RolloutOutput]):
         state.full_program_trace[-1]["evaluated_val_indices"] = sorted(valset_evaluation.scores_by_val_id.keys())
 
         if is_best_program:
-            self.logger.log(f"Iteration {state.i + 1}: Found a better program on the valset with score {valset_score}.")
+            self.logger.log(
+                f"Iteration {state.i + 1}: Found a better program on the valset with score {valset_score}.",
+                header="accept",
+            )
 
         valset = self.valset
         assert valset is not None
@@ -309,7 +312,8 @@ class GEPAEngine(Generic[DataId, DataInst, Trajectory, RolloutOutput]):
 
         self.logger.log(
             f"Iteration {state.i + 1}: Base program full valset score: {base_val_avg} "
-            f"over {base_val_coverage} / {len(valset)} examples"
+            f"over {base_val_coverage} / {len(valset)} examples",
+            header="eval",
         )
 
         # Notify callbacks of optimization start
@@ -463,7 +467,8 @@ class GEPAEngine(Generic[DataId, DataInst, Trajectory, RolloutOutput]):
                                 # REJECTED: do NOT consume merges_due or total_merges_tested
                                 self.logger.log(
                                     f"Iteration {state.i + 1}: New program subsample score {new_sum} "
-                                    f"is worse than both parents {parent_sums}, skipping merge"
+                                    f"is worse than both parents {parent_sums}, skipping merge",
+                                    header="reject",
                                 )
                                 # Notify merge rejected
                                 notify_callbacks(
@@ -484,7 +489,10 @@ class GEPAEngine(Generic[DataId, DataInst, Trajectory, RolloutOutput]):
                 # 2) Reflective mutation proposer
                 proposal = self.reflective_proposer.propose(state)
                 if proposal is None:
-                    self.logger.log(f"Iteration {state.i + 1}: Reflective mutation did not propose a new candidate")
+                    self.logger.log(
+                        f"Iteration {state.i + 1}: Reflective mutation did not propose a new candidate",
+                        header="skip",
+                    )
                     continue
 
                 # Acceptance: require strict improvement on subsample
@@ -492,7 +500,8 @@ class GEPAEngine(Generic[DataId, DataInst, Trajectory, RolloutOutput]):
                 new_sum = sum(proposal.subsample_scores_after or [])
                 if new_sum <= old_sum:
                     self.logger.log(
-                        f"Iteration {state.i + 1}: New subsample score {new_sum} is not better than old score {old_sum}, skipping"
+                        f"Iteration {state.i + 1}: New subsample score {new_sum} is not better than old score {old_sum}, skipping",
+                        header="reject",
                     )
                     # Notify candidate rejected
                     notify_callbacks(
@@ -508,7 +517,8 @@ class GEPAEngine(Generic[DataId, DataInst, Trajectory, RolloutOutput]):
                     continue
                 else:
                     self.logger.log(
-                        f"Iteration {state.i + 1}: New subsample score {new_sum} is better than old score {old_sum}. Continue to full eval and add to candidate pool."
+                        f"Iteration {state.i + 1}: New subsample score {new_sum} is better than old score {old_sum}. Continue to full eval and add to candidate pool.",
+                        header="accept",
                     )
 
                 # Accept: full eval + add
@@ -538,8 +548,8 @@ class GEPAEngine(Generic[DataId, DataInst, Trajectory, RolloutOutput]):
                         self.merge_proposer.merges_due += 1
 
             except Exception as e:
-                self.logger.log(f"Iteration {state.i + 1}: Exception during optimization: {e}")
-                self.logger.log(traceback.format_exc())
+                self.logger.log(f"Iteration {state.i + 1}: Exception during optimization: {e}", header="error")
+                self.logger.log(traceback.format_exc(), header="error")
                 # Notify error callback
                 notify_callbacks(
                     self.callbacks,
@@ -629,5 +639,5 @@ class GEPAEngine(Generic[DataId, DataInst, Trajectory, RolloutOutput]):
 
     def request_stop(self) -> None:
         """Manually request the optimization to stop gracefully."""
-        self.logger.log("Stop requested manually. Initiating graceful shutdown...")
+        self.logger.log("Stop requested manually. Initiating graceful shutdown...", header="stop")
         self._stop_requested = True

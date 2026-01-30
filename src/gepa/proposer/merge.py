@@ -293,7 +293,7 @@ class MergeProposer(ProposeNewCandidate[DataId]):
 
         # Only attempt when scheduled by engine and after a new program in last iteration
         if not (self.use_merge and self.last_iter_found_new_program and self.merges_due > 0):
-            self.logger.log(f"Iteration {i}: No merge candidates scheduled")
+            self.logger.log(f"Iteration {i}: No merge candidates scheduled", header="merge")
             return None
 
         pareto_front_programs = state.get_pareto_front_mapping()
@@ -320,14 +320,14 @@ class MergeProposer(ProposeNewCandidate[DataId]):
         )
 
         if merge_output is None:
-            self.logger.log(f"Iteration {i}: No merge candidates found")
+            self.logger.log(f"Iteration {i}: No merge candidates found", header="merge")
             return None
 
         new_program, id1, id2, ancestor = merge_output
         state.full_program_trace[-1]["merged"] = True
         state.full_program_trace[-1]["merged_entities"] = (id1, id2, ancestor)
         self.merges_performed[0].append((id1, id2, ancestor))
-        self.logger.log(f"Iteration {i}: Merged programs {id1} and {id2} via ancestor {ancestor}")
+        self.logger.log(f"Iteration {i}: Merged programs {id1} and {id2} via ancestor {ancestor}", header="merge")
 
         subsample_ids = self.select_eval_subsample_for_merged_program(
             state.prog_candidate_val_subscores[id1],
@@ -335,7 +335,8 @@ class MergeProposer(ProposeNewCandidate[DataId]):
         )
         if not subsample_ids:
             self.logger.log(
-                f"Iteration {i}: Skipping merge of {id1} and {id2} due to insufficient overlapping val coverage"
+                f"Iteration {i}: Skipping merge of {id1} and {id2} due to insufficient overlapping val coverage",
+                header="skip",
             )
             return None
 

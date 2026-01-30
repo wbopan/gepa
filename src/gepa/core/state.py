@@ -620,7 +620,7 @@ def initialize_gepa_state(
     evaluation_cache: "EvaluationCache[RolloutOutput, DataId] | None" = None,
 ) -> GEPAState[RolloutOutput, DataId]:
     if run_dir is not None and os.path.exists(os.path.join(run_dir, "gepa_state.bin")):
-        logger.log("Loading gepa state from run dir")
+        logger.log("Loading gepa state from run dir", header="init")
         gepa_state = GEPAState.load(run_dir)
         if gepa_state.frontier_type != frontier_type:
             raise ValueError(

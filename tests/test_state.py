@@ -108,16 +108,22 @@ def test_gepa_state_save_and_initialize(run_dir):
 
     assert state.__dict__ == result.__dict__
 
-    state.save(run_dir, use_cloudpickle=True)
-    result = state_mod.initialize_gepa_state(
-        run_dir=str(run_dir),
-        logger=fake_logger,
-        seed_candidate=seed,
-        valset_evaluator=valset_evaluator,
-        track_best_outputs=False,
-    )
+    # Test cloudpickle if available
+    try:
+        import cloudpickle  # noqa: F401
 
-    assert state.__dict__ == result.__dict__
+        state.save(run_dir, use_cloudpickle=True)
+        result = state_mod.initialize_gepa_state(
+            run_dir=str(run_dir),
+            logger=fake_logger,
+            seed_candidate=seed,
+            valset_evaluator=valset_evaluator,
+            track_best_outputs=False,
+        )
+
+        assert state.__dict__ == result.__dict__
+    except ImportError:
+        pytest.skip("cloudpickle not installed")
 
 
 def test_budget_hooks_excluded_from_serialization(run_dir):

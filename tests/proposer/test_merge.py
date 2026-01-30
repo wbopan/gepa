@@ -222,7 +222,7 @@ def test_sample_and_attempt_merge_respects_val_support_overlap_gate(rng):
 
 
 class _StubLogger:
-    def log(self, _msg):
+    def log(self, _msg, header=None):
         pass
 
 

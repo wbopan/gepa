@@ -30,18 +30,34 @@ def log_detailed_metrics_after_discovering_new_program(
     coverage = len(valset_scores)
     logger.log(
         f"Iteration {gepa_state.i + 1}: Valset score for new program: {valset_score}"
-        f" (coverage {coverage} / {valset_size})"
+        f" (coverage {coverage} / {valset_size})",
+        header="score",
     )
 
     agg_valset_score_new_program = val_evaluation_policy.get_valset_score(new_program_idx, gepa_state)
 
-    logger.log(f"Iteration {gepa_state.i + 1}: Val aggregate for new program: {agg_valset_score_new_program}")
-    logger.log(f"Iteration {gepa_state.i + 1}: Individual valset scores for new program: {valset_scores}")
+    logger.log(
+        f"Iteration {gepa_state.i + 1}: Val aggregate for new program: {agg_valset_score_new_program}",
+        header="score",
+    )
+    logger.log(
+        f"Iteration {gepa_state.i + 1}: Individual valset scores for new program: {valset_scores}",
+        header="score",
+    )
     if objective_scores:
-        logger.log(f"Iteration {gepa_state.i + 1}: Objective aggregate scores for new program: {objective_scores}")
-    logger.log(f"Iteration {gepa_state.i + 1}: New valset pareto front scores: {gepa_state.pareto_front_valset}")
+        logger.log(
+            f"Iteration {gepa_state.i + 1}: Objective aggregate scores for new program: {objective_scores}",
+            header="score",
+        )
+    logger.log(
+        f"Iteration {gepa_state.i + 1}: New valset pareto front scores: {gepa_state.pareto_front_valset}",
+        header="pareto",
+    )
     if gepa_state.objective_pareto_front:
-        logger.log(f"Iteration {gepa_state.i + 1}: Objective pareto front scores: {gepa_state.objective_pareto_front}")
+        logger.log(
+            f"Iteration {gepa_state.i + 1}: Objective pareto front scores: {gepa_state.objective_pareto_front}",
+            header="pareto",
+        )
 
     pareto_scores = list(gepa_state.pareto_front_valset.values())
     assert all(score > float("-inf") for score in pareto_scores), (
@@ -50,23 +66,33 @@ def log_detailed_metrics_after_discovering_new_program(
     assert len(pareto_scores) > 0
     pareto_avg = sum(pareto_scores) / len(pareto_scores)
 
-    logger.log(f"Iteration {gepa_state.i + 1}: Valset pareto front aggregate score: {pareto_avg}")
     logger.log(
-        f"Iteration {gepa_state.i + 1}: Updated valset pareto front programs: {gepa_state.program_at_pareto_front_valset}"
+        f"Iteration {gepa_state.i + 1}: Valset pareto front aggregate score: {pareto_avg}",
+        header="pareto",
+    )
+    logger.log(
+        f"Iteration {gepa_state.i + 1}: Updated valset pareto front programs: {gepa_state.program_at_pareto_front_valset}",
+        header="pareto",
     )
     if gepa_state.program_at_pareto_front_objectives:
         logger.log(
-            f"Iteration {gepa_state.i + 1}: Updated objective pareto front programs: {gepa_state.program_at_pareto_front_objectives}"
+            f"Iteration {gepa_state.i + 1}: Updated objective pareto front programs: {gepa_state.program_at_pareto_front_objectives}",
+            header="pareto",
         )
     logger.log(
-        f"Iteration {gepa_state.i + 1}: Best valset aggregate score so far: {max(gepa_state.program_full_scores_val_set)}"
+        f"Iteration {gepa_state.i + 1}: Best valset aggregate score so far: {max(gepa_state.program_full_scores_val_set)}",
+        header="best",
     )
     logger.log(
-        f"Iteration {gepa_state.i + 1}: Best program as per aggregate score on valset: {best_prog_per_agg_val_score}"
+        f"Iteration {gepa_state.i + 1}: Best program as per aggregate score on valset: {best_prog_per_agg_val_score}",
+        header="best",
     )
-    logger.log(f"Iteration {gepa_state.i + 1}: Best score on valset: {best_score_on_valset}")
-    logger.log(f"Iteration {gepa_state.i + 1}: Linear pareto front program index: {linear_pareto_front_program_idx}")
-    logger.log(f"Iteration {gepa_state.i + 1}: New program candidate index: {new_program_idx}")
+    logger.log(f"Iteration {gepa_state.i + 1}: Best score on valset: {best_score_on_valset}", header="best")
+    logger.log(
+        f"Iteration {gepa_state.i + 1}: Linear pareto front program index: {linear_pareto_front_program_idx}",
+        header="iter",
+    )
+    logger.log(f"Iteration {gepa_state.i + 1}: New program candidate index: {new_program_idx}", header="iter")
 
     metrics = {
         "iteration": gepa_state.i + 1,

@@ -86,7 +86,7 @@ class ReflectiveMutationProposer(ProposeNewCandidate[DataId]):
         for name in components_to_update:
             # Gracefully handle cases where a selected component has no data in reflective_dataset
             if name not in reflective_dataset or not reflective_dataset.get(name):
-                self.logger.log(f"Component '{name}' is not in reflective dataset. Skipping.")
+                self.logger.log(f"Component '{name}' is not in reflective dataset. Skipping.", header="skip")
                 continue
 
             base_instruction = candidate[name]
@@ -108,7 +108,8 @@ class ReflectiveMutationProposer(ProposeNewCandidate[DataId]):
         curr_prog = state.program_candidates[curr_prog_id]
         state.full_program_trace[-1]["selected_program_candidate"] = curr_prog_id
         self.logger.log(
-            f"Iteration {i}: Selected program {curr_prog_id} score: {state.program_full_scores_val_set[curr_prog_id]}"
+            f"Iteration {i}: Selected program {curr_prog_id} score: {state.program_full_scores_val_set[curr_prog_id]}",
+            header="select",
         )
 
         # Notify candidate selected
@@ -187,7 +188,7 @@ class ReflectiveMutationProposer(ProposeNewCandidate[DataId]):
             )
 
         if not eval_curr.trajectories or len(eval_curr.trajectories) == 0:
-            self.logger.log(f"Iteration {i}: No trajectories captured. Skipping.")
+            self.logger.log(f"Iteration {i}: No trajectories captured. Skipping.", header="skip")
             notify_callbacks(
                 self.callbacks,
                 "on_evaluation_skipped",
@@ -202,7 +203,7 @@ class ReflectiveMutationProposer(ProposeNewCandidate[DataId]):
             return None
 
         if self.skip_perfect_score and all(s >= self.perfect_score for s in eval_curr.scores):
-            self.logger.log(f"Iteration {i}: All subsample scores perfect. Skipping.")
+            self.logger.log(f"Iteration {i}: All subsample scores perfect. Skipping.", header="skip")
             notify_callbacks(
                 self.callbacks,
                 "on_evaluation_skipped",
@@ -271,15 +272,19 @@ class ReflectiveMutationProposer(ProposeNewCandidate[DataId]):
             )
 
             for pname, text in new_texts.items():
-                self.logger.log(f"Iteration {i}: Proposed new text for {pname}: {text}")
+                self.logger.log(f"Iteration {i}: Proposed new text for {pname}", header="propose")
+                if hasattr(self.logger, "show"):
+                    self.logger.show(text, title=f"Proposed: {pname}")
+                else:
+                    self.logger.log(text)
             self.experiment_tracker.log_metrics(
                 {f"new_instruction_{pname}": text for pname, text in new_texts.items()}, step=i
             )
         except Exception as e:
-            self.logger.log(f"Iteration {i}: Exception during reflection/proposal: {e}")
+            self.logger.log(f"Iteration {i}: Exception during reflection/proposal: {e}", header="error")
             import traceback
 
-            self.logger.log(traceback.format_exc())
+            self.logger.log(traceback.format_exc(), header="error")
             return None
 
         # 4) Create candidate, evaluate on same minibatch (no need to capture traces)

@@ -6,6 +6,7 @@ from .api import optimize
 from .core.adapter import EvaluationBatch, GEPAAdapter
 from .core.result import GEPAResult
 from .examples import aime
+from .logging.logger import get_logger
 from .utils.stop_condition import (
     CompositeStopper,
     FileStopper,

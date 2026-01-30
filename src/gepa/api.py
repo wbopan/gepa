@@ -4,7 +4,7 @@
 import os
 import random
 from collections.abc import Sequence
-from typing import TYPE_CHECKING, Any, Literal, cast
+from typing import TYPE_CHECKING, Literal, cast
 
 if TYPE_CHECKING:
     from gepa.core.callbacks import GEPACallback
@@ -20,7 +20,7 @@ from gepa.core.engine import GEPAEngine
 from gepa.core.result import GEPAResult
 from gepa.core.state import EvaluationCache, FrontierType
 from gepa.logging.experiment_tracker import create_experiment_tracker
-from gepa.logging.logger import LoggerProtocol, StdOutLogger
+from gepa.logging.logger import LoggerProtocol, get_logger
 from gepa.proposer.merge import MergeProposer
 from gepa.proposer.reflective_mutation.base import CandidateSelector, LanguageModel, ReflectionComponentSelector
 from gepa.proposer.reflective_mutation.reflective_mutation import ReflectiveMutationProposer
@@ -67,12 +67,8 @@ def optimize(
     logger: LoggerProtocol | None = None,
     run_dir: str | None = None,
     callbacks: "list[GEPACallback] | None" = None,
-    use_wandb: bool = False,
-    wandb_api_key: str | None = None,
-    wandb_init_kwargs: dict[str, Any] | None = None,
-    use_mlflow: bool = False,
-    mlflow_tracking_uri: str | None = None,
-    mlflow_experiment_name: str | None = None,
+    use_weave: bool = False,
+    weave_project_name: str | None = None,
     track_best_outputs: bool = False,
     display_progress_bar: bool = False,
     use_cloudpickle: bool = False,
@@ -154,14 +150,8 @@ def optimize(
     - logger: A `LoggerProtocol` instance that is used to log the progress of the optimization.
     - callbacks: Optional list of callback objects for observing optimization progress. Callbacks receive events like on_optimization_start, on_iteration_start, on_candidate_accepted, etc. See `gepa.core.callbacks.GEPACallback` for the full protocol.
     - run_dir: The directory to save the results to. Optimization state and results will be saved to this directory. If the directory already exists, GEPA will read the state from this directory and resume the optimization from the last saved state. If provided, a FileStopper is automatically created which checks for the presence of "gepa.stop" in this directory, allowing graceful stopping of the optimization process upon its presence.
-    - use_wandb: Whether to use Weights and Biases to log the progress of the optimization.
-    - wandb_api_key: The API key to use for Weights and Biases.
-    - wandb_init_kwargs: Additional keyword arguments to pass to the Weights and Biases initialization.
-    - use_mlflow: Whether to use MLflow to log the progress of the optimization.
-      When enabled, this also enables LiteLLM's MLflow tracing for LLM call tracking.
-      Both wandb and mlflow can be used simultaneously if desired.
-    - mlflow_tracking_uri: The tracking URI to use for MLflow.
-    - mlflow_experiment_name: The experiment name to use for MLflow.
+    - use_weave: Whether to use wandb weave for experiment tracking and LLM call tracing. When enabled, weave auto-patches litellm for tracing.
+    - weave_project_name: The project name to use for wandb weave. Defaults to 'gepa-optimization'.
     - track_best_outputs: Whether to track the best outputs on the validation set. If True, GEPAResult will contain the best outputs obtained for each task in the validation set.
     - display_progress_bar: Show a tqdm progress bar over metric calls when enabled.
     - use_cloudpickle: Use cloudpickle instead of pickle. This can be helpful when the serialized state contains dynamically generated DSPy signatures.
@@ -181,13 +171,6 @@ def optimize(
 
         cache_dir = os.path.expanduser("~/.cache/litellm")
         litellm.cache = Cache(type="disk", disk_cache_dir=cache_dir)
-
-    # Configure LiteLLM MLflow tracing when use_mlflow is enabled
-    if use_mlflow:
-        import litellm
-
-        if "mlflow" not in litellm.callbacks:
-            litellm.callbacks.append("mlflow")
 
     # Validate seed_candidate is not None or empty
     if seed_candidate is None or not seed_candidate:
@@ -273,7 +256,7 @@ def optimize(
         reflection_lm = _reflection_lm
 
     if logger is None:
-        logger = StdOutLogger()
+        logger = get_logger()
 
     rng = random.Random(seed)
 
@@ -328,12 +311,8 @@ def optimize(
         )
 
     experiment_tracker = create_experiment_tracker(
-        use_wandb=use_wandb,
-        wandb_api_key=wandb_api_key,
-        wandb_init_kwargs=wandb_init_kwargs,
-        use_mlflow=use_mlflow,
-        mlflow_tracking_uri=mlflow_tracking_uri,
-        mlflow_experiment_name=mlflow_experiment_name,
+        use_weave=use_weave,
+        weave_project_name=weave_project_name,
     )
 
     if reflection_prompt_template is not None:

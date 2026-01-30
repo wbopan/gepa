@@ -143,6 +143,15 @@ class ReflectiveMutationProposer(ProposeNewCandidate[DataId]):
         state.full_program_trace[-1]["subsample_ids"] = subsample_ids
         minibatch = self.trainset.fetch(subsample_ids)
 
+        # Log AdaBoost sampler average weight if applicable
+        if hasattr(self.batch_sampler, "get_last_sampled_avg_weight"):
+            avg_weight = self.batch_sampler.get_last_sampled_avg_weight()
+            self.experiment_tracker.log_metrics(
+                {"sampled_avg_weight": avg_weight},
+                step=state.total_num_evals,
+                commit=False,
+            )
+
         # Notify minibatch sampled
         notify_callbacks(
             self.callbacks,

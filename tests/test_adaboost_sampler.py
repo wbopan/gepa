@@ -6,7 +6,7 @@ from collections import Counter
 
 import pytest
 
-from gepa.strategies.adaboost_sampler import AdaBoostBatchSampler
+from gepa.strategies.adaboost_sampler import AdaBoostBatchSampler, PAdaBoostBatchSampler, PMaxBatchSampler
 
 
 class MockDataLoader:
@@ -37,6 +37,8 @@ class MockGEPAState:
 
 
 class TestAdaBoostBatchSampler:
+    """Tests for standard AdaBoost batch sampler (all samples updated regardless of solvability)."""
+
     def test_initial_weights_are_one(self):
         """Test that initial weights are 1.0 for all samples."""
         sampler = AdaBoostBatchSampler(minibatch_size=3, rng=random.Random(42))
@@ -53,8 +55,7 @@ class TestAdaBoostBatchSampler:
         """Test that samples with low scores have increased weights."""
         sampler = AdaBoostBatchSampler(minibatch_size=2, beta=1.0, rng=random.Random(42))
         loader = MockDataLoader([0, 1, 2])
-        # All samples are solvable (best_score > 0)
-        state = MockGEPAState(pareto_front_valset={0: 1.0, 1: 1.0, 2: 1.0})
+        state = MockGEPAState()
 
         # First sample to initialize weights
         sampler.next_minibatch_ids(loader, state)
@@ -75,8 +76,7 @@ class TestAdaBoostBatchSampler:
         """Test that samples with high scores have decreased weights."""
         sampler = AdaBoostBatchSampler(minibatch_size=2, beta=1.0, rng=random.Random(42))
         loader = MockDataLoader([0, 1, 2])
-        # All samples are solvable (best_score > 0)
-        state = MockGEPAState(pareto_front_valset={0: 1.0, 1: 1.0, 2: 1.0})
+        state = MockGEPAState()
 
         # First sample to initialize weights
         sampler.next_minibatch_ids(loader, state)
@@ -98,8 +98,7 @@ class TestAdaBoostBatchSampler:
             minibatch_size=2, beta=10.0, min_weight=0.1, max_weight=10.0, rng=random.Random(42)
         )
         loader = MockDataLoader([0, 1])
-        # All samples are solvable (best_score > 0)
-        state = MockGEPAState(pareto_front_valset={0: 1.0, 1: 1.0})
+        state = MockGEPAState()
 
         sampler.next_minibatch_ids(loader, state)
 
@@ -120,8 +119,7 @@ class TestAdaBoostBatchSampler:
         """Test that samples that failed are sampled more frequently over many iterations."""
         sampler = AdaBoostBatchSampler(minibatch_size=1, beta=2.0, rng=random.Random(42))
         loader = MockDataLoader([0, 1, 2])
-        # All samples are solvable (best_score > 0)
-        state = MockGEPAState(pareto_front_valset={0: 1.0, 1: 1.0, 2: 1.0})
+        state = MockGEPAState()
 
         # Initialize
         sampler.next_minibatch_ids(loader, state)
@@ -160,8 +158,7 @@ class TestAdaBoostBatchSampler:
         """Test that only observed samples have their weights updated."""
         sampler = AdaBoostBatchSampler(minibatch_size=2, beta=1.0, rng=random.Random(42))
         loader = MockDataLoader([0, 1, 2, 3, 4])
-        # All samples are solvable (best_score > 0)
-        state = MockGEPAState(pareto_front_valset={0: 1.0, 1: 1.0, 2: 1.0, 3: 1.0, 4: 1.0})
+        state = MockGEPAState()
 
         sampler.next_minibatch_ids(loader, state)
 
@@ -225,8 +222,7 @@ class TestAdaBoostBatchSampler:
         """Test get_last_sampled_avg_weight returns correct average."""
         sampler = AdaBoostBatchSampler(minibatch_size=2, beta=1.0, rng=random.Random(42))
         loader = MockDataLoader([0, 1, 2])
-        # All samples are solvable (best_score > 0)
-        state = MockGEPAState(pareto_front_valset={0: 1.0, 1: 1.0, 2: 1.0})
+        state = MockGEPAState()
 
         # First sample - all weights are 1.0
         sampler.next_minibatch_ids(loader, state)
@@ -269,13 +265,33 @@ class TestAdaBoostBatchSampler:
 
         assert result1 == result2
 
+    def test_all_samples_updated_regardless_of_score(self):
+        """Test that standard AdaBoost updates all samples, even those with zero scores."""
+        sampler = AdaBoostBatchSampler(minibatch_size=2, beta=1.0, rng=random.Random(42))
+        loader = MockDataLoader([0, 1, 2])
+        state = MockGEPAState()
 
-class TestParetoInternalAdaBoost:
+        # First sample to initialize weights
+        sampler.next_minibatch_ids(loader, state)
+
+        # Add trace with zero scores for all samples
+        # In standard AdaBoost, all should get weight increases (since error = 1.0)
+        state.full_program_trace.append({"subsample_ids": [0, 1, 2], "subsample_scores": [0.0, 0.0, 0.0]})
+
+        sampler.next_minibatch_ids(loader, state)
+        weights = sampler.get_weights()
+
+        # All weights should be equal (all got same update, then normalized)
+        assert weights[0] == pytest.approx(weights[1], rel=0.01)
+        assert weights[1] == pytest.approx(weights[2], rel=0.01)
+
+
+class TestPAdaBoostBatchSampler:
     """Tests for Pareto-Internal AdaBoost behavior (solvable vs unsolvable samples)."""
 
     def test_unsolvable_samples_weights_frozen(self):
         """Test that unsolvable samples (best_score == 0) have their weights frozen."""
-        sampler = AdaBoostBatchSampler(minibatch_size=2, beta=1.0, rng=random.Random(42))
+        sampler = PAdaBoostBatchSampler(minibatch_size=2, beta=1.0, rng=random.Random(42))
         loader = MockDataLoader([0, 1, 2])
         # Sample 0 is unsolvable (best_score == 0), samples 1 and 2 are solvable
         state = MockGEPAState(pareto_front_valset={0: 0.0, 1: 1.0, 2: 1.0})
@@ -300,7 +316,7 @@ class TestParetoInternalAdaBoost:
 
     def test_solvable_samples_weights_updated(self):
         """Test that solvable samples (best_score > 0) have their weights updated."""
-        sampler = AdaBoostBatchSampler(minibatch_size=2, beta=1.0, rng=random.Random(42))
+        sampler = PAdaBoostBatchSampler(minibatch_size=2, beta=1.0, rng=random.Random(42))
         loader = MockDataLoader([0, 1])
         # Both samples are solvable
         state = MockGEPAState(pareto_front_valset={0: 1.0, 1: 1.0})
@@ -319,7 +335,7 @@ class TestParetoInternalAdaBoost:
 
     def test_mixed_solvable_unsolvable_samples(self):
         """Test behavior with a mix of solvable and unsolvable samples."""
-        sampler = AdaBoostBatchSampler(minibatch_size=3, beta=2.0, rng=random.Random(42))
+        sampler = PAdaBoostBatchSampler(minibatch_size=3, beta=2.0, rng=random.Random(42))
         loader = MockDataLoader([0, 1, 2, 3])
         # Samples 0 and 1 are unsolvable, samples 2 and 3 are solvable
         state = MockGEPAState(pareto_front_valset={0: 0.0, 1: 0.0, 2: 0.5, 3: 1.0})
@@ -341,7 +357,7 @@ class TestParetoInternalAdaBoost:
 
     def test_unsolvable_sample_not_dominating(self):
         """Test that unsolvable samples don't dominate sampling over time."""
-        sampler = AdaBoostBatchSampler(minibatch_size=1, beta=2.0, rng=random.Random(42))
+        sampler = PAdaBoostBatchSampler(minibatch_size=1, beta=2.0, rng=random.Random(42))
         loader = MockDataLoader([0, 1, 2])
         # Sample 0 is unsolvable, samples 1 and 2 are solvable
         state = MockGEPAState(pareto_front_valset={0: 0.0, 1: 1.0, 2: 1.0})
@@ -363,7 +379,7 @@ class TestParetoInternalAdaBoost:
 
     def test_sample_becomes_solvable(self):
         """Test that samples can become solvable when Pareto front is updated."""
-        sampler = AdaBoostBatchSampler(minibatch_size=2, beta=1.0, rng=random.Random(42))
+        sampler = PAdaBoostBatchSampler(minibatch_size=2, beta=1.0, rng=random.Random(42))
         loader = MockDataLoader([0, 1])
         # Initially sample 0 is unsolvable
         state = MockGEPAState(pareto_front_valset={0: 0.0, 1: 1.0})
@@ -390,7 +406,7 @@ class TestParetoInternalAdaBoost:
 
     def test_empty_pareto_front_all_unsolvable(self):
         """Test behavior when pareto_front_valset is empty (all samples treated as unsolvable)."""
-        sampler = AdaBoostBatchSampler(minibatch_size=2, beta=1.0, rng=random.Random(42))
+        sampler = PAdaBoostBatchSampler(minibatch_size=2, beta=1.0, rng=random.Random(42))
         loader = MockDataLoader([0, 1, 2])
         # Empty pareto front means no sample has been solved yet
         state = MockGEPAState(pareto_front_valset={})
@@ -406,3 +422,220 @@ class TestParetoInternalAdaBoost:
         # All weights should be equal (all frozen at 1.0, then normalized)
         assert weights[0] == pytest.approx(weights[1], rel=0.01)
         assert weights[1] == pytest.approx(weights[2], rel=0.01)
+
+    def test_initial_weights_are_one(self):
+        """Test that initial weights are 1.0 for all samples."""
+        sampler = PAdaBoostBatchSampler(minibatch_size=3, rng=random.Random(42))
+        loader = MockDataLoader([0, 1, 2, 3, 4])
+        state = MockGEPAState()
+
+        sampler.next_minibatch_ids(loader, state)
+        weights = sampler.get_weights()
+
+        for w in weights.values():
+            assert w == pytest.approx(1.0, rel=0.01)
+
+    def test_empty_loader_raises(self):
+        """Test that empty loader raises ValueError."""
+        sampler = PAdaBoostBatchSampler(minibatch_size=2, rng=random.Random(42))
+        loader = MockDataLoader([])
+        state = MockGEPAState()
+
+        with pytest.raises(ValueError, match="Cannot sample from empty loader"):
+            sampler.next_minibatch_ids(loader, state)
+
+    def test_get_last_sampled_avg_weight(self):
+        """Test get_last_sampled_avg_weight returns correct average."""
+        sampler = PAdaBoostBatchSampler(minibatch_size=2, beta=1.0, rng=random.Random(42))
+        loader = MockDataLoader([0, 1, 2])
+        # All samples are solvable (best_score > 0)
+        state = MockGEPAState(pareto_front_valset={0: 1.0, 1: 1.0, 2: 1.0})
+
+        # First sample - all weights are 1.0
+        sampler.next_minibatch_ids(loader, state)
+        avg = sampler.get_last_sampled_avg_weight()
+        assert avg == pytest.approx(1.0, rel=0.01)
+
+        # Update weights
+        state.full_program_trace.append({"subsample_ids": [0, 1, 2], "subsample_scores": [0.0, 0.5, 1.0]})
+        sampler.next_minibatch_ids(loader, state)
+
+        # Average should reflect the sampled items' weights
+        avg = sampler.get_last_sampled_avg_weight()
+        assert avg > 0  # Should be positive
+
+
+class TestPMaxBatchSampler:
+    """Tests for PMax behavior (solved samples reset, unsolved samples get AdaBoost)."""
+
+    def test_solved_samples_weight_reset_to_one(self):
+        """Test that once-solved samples (best_score > 0) have their weights reset to 1.0."""
+        sampler = PMaxBatchSampler(minibatch_size=2, beta=2.0, rng=random.Random(42))
+        loader = MockDataLoader([0, 1, 2])
+        # Sample 0 is solved (best_score > 0), samples 1 and 2 are never-solved
+        state = MockGEPAState(pareto_front_valset={0: 0.5, 1: 0.0, 2: 0.0})
+
+        # First sample to initialize weights
+        sampler.next_minibatch_ids(loader, state)
+
+        # Add trace with low scores for all samples
+        # Sample 0: weight should be reset to 1.0 (solved)
+        # Samples 1 and 2: weights should increase (never-solved, low score -> AdaBoost boost)
+        state.full_program_trace.append({"subsample_ids": [0, 1, 2], "subsample_scores": [0.1, 0.1, 0.1]})
+
+        sampler.next_minibatch_ids(loader, state)
+        weights = sampler.get_weights()
+
+        # Samples 1 and 2 (never-solved) should have higher weights than sample 0 (solved, reset)
+        # because they got AdaBoost increases while sample 0 was reset to 1.0
+        assert weights[1] > weights[0]
+        assert weights[2] > weights[0]
+
+    def test_unsolved_samples_adaboost_update(self):
+        """Test that never-solved samples (best_score == 0) get AdaBoost weight updates."""
+        sampler = PMaxBatchSampler(minibatch_size=2, beta=1.0, rng=random.Random(42))
+        loader = MockDataLoader([0, 1])
+        # Both samples are never-solved
+        state = MockGEPAState(pareto_front_valset={0: 0.0, 1: 0.0})
+
+        sampler.next_minibatch_ids(loader, state)
+
+        # Sample 0 has low score (weight should increase)
+        # Sample 1 has high score (weight should decrease)
+        state.full_program_trace.append({"subsample_ids": [0, 1], "subsample_scores": [0.1, 0.9]})
+
+        sampler.next_minibatch_ids(loader, state)
+        weights = sampler.get_weights()
+
+        # Sample 0 should have higher weight than sample 1
+        assert weights[0] > weights[1]
+
+    def test_mixed_solved_unsolved_samples(self):
+        """Test behavior with a mix of solved and never-solved samples."""
+        sampler = PMaxBatchSampler(minibatch_size=3, beta=2.0, rng=random.Random(42))
+        loader = MockDataLoader([0, 1, 2, 3])
+        # Samples 0 and 1 are solved, samples 2 and 3 are never-solved
+        state = MockGEPAState(pareto_front_valset={0: 0.5, 1: 1.0, 2: 0.0, 3: 0.0})
+
+        sampler.next_minibatch_ids(loader, state)
+
+        # All samples get low scores
+        # Solved (0, 1): weights reset to 1.0
+        # Never-solved (2, 3): weights increased by AdaBoost
+        state.full_program_trace.append({"subsample_ids": [0, 1, 2, 3], "subsample_scores": [0.0, 0.0, 0.1, 0.2]})
+
+        sampler.next_minibatch_ids(loader, state)
+        weights = sampler.get_weights()
+
+        # Never-solved samples (2, 3) should have higher weights than solved samples (0, 1)
+        assert weights[2] > weights[0]
+        assert weights[2] > weights[1]
+        assert weights[3] > weights[0]
+        assert weights[3] > weights[1]
+
+    def test_solved_sample_stays_reset_across_traces(self):
+        """Test that solved samples continue to get reset even with multiple trace updates."""
+        sampler = PMaxBatchSampler(minibatch_size=2, beta=2.0, rng=random.Random(42))
+        loader = MockDataLoader([0, 1])
+        # Sample 0 is solved, sample 1 is never-solved
+        state = MockGEPAState(pareto_front_valset={0: 0.5, 1: 0.0})
+
+        sampler.next_minibatch_ids(loader, state)
+
+        # Add multiple traces with low scores
+        # Sample 0 should stay at normalized 1.0 (solved, reset every time)
+        # Sample 1's weight should keep increasing (never-solved, AdaBoost)
+        for _ in range(5):
+            state.full_program_trace.append({"subsample_ids": [0, 1], "subsample_scores": [0.0, 0.0]})
+
+        sampler.next_minibatch_ids(loader, state)
+        weights = sampler.get_weights()
+
+        # Sample 1 (never-solved with repeated low scores) should have much higher weight
+        assert weights[1] > weights[0]
+
+    def test_sample_becomes_solved(self):
+        """Test that samples can become solved when Pareto front is updated."""
+        sampler = PMaxBatchSampler(minibatch_size=2, beta=2.0, rng=random.Random(42))
+        loader = MockDataLoader([0, 1])
+        # Initially both samples are never-solved
+        state = MockGEPAState(pareto_front_valset={0: 0.0, 1: 0.0})
+
+        sampler.next_minibatch_ids(loader, state)
+
+        # First trace: both samples get low scores (both get AdaBoost boost)
+        state.full_program_trace.append({"subsample_ids": [0, 1], "subsample_scores": [0.1, 0.1]})
+        sampler.next_minibatch_ids(loader, state)
+
+        # Now sample 0 becomes solved (Pareto front updated externally)
+        state.pareto_front_valset[0] = 0.5
+
+        # Second trace: sample 0 should now get reset to 1.0, sample 1 should continue AdaBoost
+        state.full_program_trace.append({"subsample_ids": [0, 1], "subsample_scores": [0.1, 0.1]})
+        sampler.next_minibatch_ids(loader, state)
+        weights = sampler.get_weights()
+
+        # Sample 1 (still never-solved, got two rounds of AdaBoost) should have higher weight
+        # Sample 0 (now solved, got reset) should have lower weight
+        assert weights[1] > weights[0]
+
+    def test_empty_pareto_front_all_unsolved(self):
+        """Test behavior when pareto_front_valset is empty (all samples treated as never-solved)."""
+        sampler = PMaxBatchSampler(minibatch_size=2, beta=1.0, rng=random.Random(42))
+        loader = MockDataLoader([0, 1, 2])
+        # Empty pareto front means all samples are never-solved
+        state = MockGEPAState(pareto_front_valset={})
+
+        sampler.next_minibatch_ids(loader, state)
+
+        # Add trace with varying scores - all should get AdaBoost updates
+        state.full_program_trace.append({"subsample_ids": [0, 1, 2], "subsample_scores": [0.0, 0.5, 1.0]})
+
+        sampler.next_minibatch_ids(loader, state)
+        weights = sampler.get_weights()
+
+        # Sample 0 (low score) should have highest weight
+        # Sample 2 (high score) should have lowest weight
+        assert weights[0] > weights[1]
+        assert weights[1] > weights[2]
+
+    def test_initial_weights_are_one(self):
+        """Test that initial weights are 1.0 for all samples."""
+        sampler = PMaxBatchSampler(minibatch_size=3, rng=random.Random(42))
+        loader = MockDataLoader([0, 1, 2, 3, 4])
+        state = MockGEPAState()
+
+        sampler.next_minibatch_ids(loader, state)
+        weights = sampler.get_weights()
+
+        for w in weights.values():
+            assert w == pytest.approx(1.0, rel=0.01)
+
+    def test_empty_loader_raises(self):
+        """Test that empty loader raises ValueError."""
+        sampler = PMaxBatchSampler(minibatch_size=2, rng=random.Random(42))
+        loader = MockDataLoader([])
+        state = MockGEPAState()
+
+        with pytest.raises(ValueError, match="Cannot sample from empty loader"):
+            sampler.next_minibatch_ids(loader, state)
+
+    def test_get_last_sampled_avg_weight(self):
+        """Test get_last_sampled_avg_weight returns correct average."""
+        sampler = PMaxBatchSampler(minibatch_size=2, beta=1.0, rng=random.Random(42))
+        loader = MockDataLoader([0, 1, 2])
+        # All samples are never-solved
+        state = MockGEPAState(pareto_front_valset={0: 0.0, 1: 0.0, 2: 0.0})
+
+        # First sample - all weights are 1.0
+        sampler.next_minibatch_ids(loader, state)
+        avg = sampler.get_last_sampled_avg_weight()
+        assert avg == pytest.approx(1.0, rel=0.01)
+
+        # Update weights
+        state.full_program_trace.append({"subsample_ids": [0, 1, 2], "subsample_scores": [0.0, 0.5, 1.0]})
+        sampler.next_minibatch_ids(loader, state)
+
+        # Average should reflect the sampled items' weights
+        avg = sampler.get_last_sampled_avg_weight()
+        assert avg > 0  # Should be positive

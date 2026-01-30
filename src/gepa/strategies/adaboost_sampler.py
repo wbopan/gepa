@@ -116,24 +116,22 @@ class AdaBoostBatchSampler(BatchSampler[DataId, DataInst]):
 
     def _normalize_weights(self, all_ids: Sequence[DataId]) -> None:
         """Normalize weights so they sum to the number of samples."""
-        total = sum(self._weights.get(data_id, 1.0) for data_id in all_ids)
+        total = sum(self._weights[data_id] for data_id in all_ids)
         if total == 0:
             return
         scale = len(all_ids) / total
         for data_id in all_ids:
-            if data_id in self._weights:
-                self._weights[data_id] *= scale
+            self._weights[data_id] *= scale
 
     def _weighted_sample_without_replacement(self, all_ids: Sequence[DataId]) -> list[DataId]:
         """Sample minibatch_size items without replacement using weights."""
         n = min(self.minibatch_size, len(all_ids))
         remaining = list(all_ids)
-        remaining_weights = [self._weights.get(data_id, 1.0) for data_id in remaining]
+        remaining_weights = [self._weights[data_id] for data_id in remaining]
         selected: list[DataId] = []
 
         for _ in range(n):
-            total = sum(remaining_weights)
-            if total == 0:
+            if sum(remaining_weights) == 0:
                 break
             idx = self.rng.choices(range(len(remaining)), weights=remaining_weights, k=1)[0]
             selected.append(remaining.pop(idx))

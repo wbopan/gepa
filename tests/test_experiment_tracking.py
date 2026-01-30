@@ -9,9 +9,8 @@ from gepa.logging.experiment_tracker import ExperimentTracker, create_experiment
 def has_weave():
     """Check if weave and wandb are available."""
     try:
-        import weave  # noqa: F401
-
         import wandb  # noqa: F401
+        import weave  # noqa: F401
 
         return True
     except ImportError:

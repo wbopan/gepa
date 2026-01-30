@@ -150,18 +150,15 @@ class ExperimentTracker:
         total_metric_calls: int,
     ) -> None:
         """Save final optimization results to wandb summary."""
-        if not self.use_weave:
-            return
-        try:
-            import wandb
-
-            wandb.summary["best_candidate_idx"] = best_candidate_idx
-            wandb.summary["best_score"] = best_score
-            wandb.summary["total_candidates"] = total_candidates
-            wandb.summary["total_metric_calls"] = total_metric_calls
-            wandb.summary["best_candidate"] = best_candidate
-        except Exception as e:
-            print(f"Warning: Failed to log final results: {e}")
+        self.log_summary(
+            {
+                "best_candidate_idx": best_candidate_idx,
+                "best_score": best_score,
+                "total_candidates": total_candidates,
+                "total_metric_calls": total_metric_calls,
+                "best_candidate": best_candidate,
+            }
+        )
 
 
 def create_experiment_tracker(

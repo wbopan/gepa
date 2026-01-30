@@ -5,48 +5,7 @@
 
 import weave
 
-from gepa.logging.weave_tracing import add_call_feedback, weave_op
-
-
-class TestWeaveOp:
-    """Tests for weave_op (which is now just weave.op)."""
-
-    def test_weave_op_is_weave_op(self):
-        """Test that weave_op is the same as weave.op."""
-        assert weave_op is weave.op
-
-    def test_weave_op_preserves_function_behavior(self):
-        """Test that decorated function behaves correctly."""
-
-        @weave_op(name="test.add")
-        def add(a, b):
-            return a + b
-
-        @weave_op(name="test.multiply")
-        def multiply(a, b):
-            return a * b
-
-        assert add(2, 3) == 5
-        assert multiply(2, 3) == 6
-
-    def test_weave_op_with_kwargs(self):
-        """Test weave_op with keyword arguments."""
-
-        @weave_op(name="test.greet")
-        def greet(name, greeting="Hello"):
-            return f"{greeting}, {name}!"
-
-        assert greet("Alice") == "Hello, Alice!"
-        assert greet("Bob", greeting="Hi") == "Hi, Bob!"
-
-    def test_weave_op_without_name(self):
-        """Test weave_op without explicit name."""
-
-        @weave_op()
-        def unnamed_function():
-            return "result"
-
-        assert unnamed_function() == "result"
+from gepa.logging.weave_tracing import add_call_feedback
 
 
 class TestAddCallFeedback:
@@ -74,17 +33,17 @@ class TestIntegration:
         """Test multiple decorated function calls in sequence."""
         call_order = []
 
-        @weave_op(name="test.step1")
+        @weave.op(name="test.step1")
         def step1():
             call_order.append("step1")
             return 1
 
-        @weave_op(name="test.step2")
+        @weave.op(name="test.step2")
         def step2(x):
             call_order.append("step2")
             return x + 1
 
-        @weave_op(name="test.step3")
+        @weave.op(name="test.step3")
         def step3(x):
             call_order.append("step3")
             return x * 2

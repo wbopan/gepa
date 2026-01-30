@@ -1,44 +1,28 @@
 # Copyright (c) 2025 Lakshya A Agrawal and the GEPA contributors
 # https://github.com/gepa-ai/gepa
 
-try:
-    import weave
+import weave
 
-    WEAVE_AVAILABLE = True
-except ImportError:
-    WEAVE_AVAILABLE = False
 
-if WEAVE_AVAILABLE:
+class GEPAPrompt(weave.Prompt):
+    """A GEPA prompt candidate with optimization metadata."""
 
-    class ProposedPrompt(weave.Object):
-        """A proposed prompt candidate (before valset evaluation)."""
+    content: dict[str, str]
+    iteration: int = 0
+    parent_ref: str | None = None
 
-        content: dict[str, str]
-        parent_ref: str | None = None
-        iteration: int = 0
-        minibatch_score_before: float = 0.0
-        minibatch_score_after: float = 0.0
-        accepted: bool = False
+    # Minibatch evaluation scores
+    minibatch_score_before: float = 0.0
+    minibatch_score_after: float = 0.0
 
-    class AcceptedPrompt(weave.Object):
-        """An accepted prompt with valset evaluation results."""
+    # Acceptance status and valset evaluation
+    accepted: bool = False
+    candidate_idx: int | None = None  # Only set when accepted
+    valset_score: float | None = None  # Only set when accepted
 
-        proposed_ref: str  # ref to the ProposedPrompt
-        candidate_idx: int
-        valset_score: float
-
-else:
-
-    class ProposedPrompt:  # type: ignore[no-redef]
-        """A proposed prompt candidate (before valset evaluation)."""
-
-        def __init__(self, **kwargs):
-            for k, v in kwargs.items():
-                setattr(self, k, v)
-
-    class AcceptedPrompt:  # type: ignore[no-redef]
-        """An accepted prompt with valset evaluation results."""
-
-        def __init__(self, **kwargs):
-            for k, v in kwargs.items():
-                setattr(self, k, v)
+    def format(self, **kwargs) -> dict[str, str]:
+        """Return the prompt content, optionally with parameter substitution."""
+        result = {}
+        for key, value in self.content.items():
+            result[key] = value.format(**kwargs) if kwargs else value
+        return result

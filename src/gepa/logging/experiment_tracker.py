@@ -35,7 +35,7 @@ class ExperimentTracker:
                 # Suppress weave trace URL printing by default
                 os.environ.setdefault("WEAVE_PRINT_CALL_LINK", "false")
 
-                import weave  # noqa: F401 weave auto-patches litellm when imported with wandb
+                import weave
 
                 import wandb
 
@@ -102,62 +102,44 @@ class ExperimentTracker:
                 pass
         return False
 
-    def publish_proposed_prompt(
+    def publish_prompt(
         self,
         content: dict[str, str],
         iteration: int,
-        parent_ref: str | None,
-        minibatch_score_before: float,
-        minibatch_score_after: float,
-        accepted: bool,
+        parent_ref: str | None = None,
+        minibatch_score_before: float = 0.0,
+        minibatch_score_after: float = 0.0,
+        accepted: bool = False,
+        candidate_idx: int | None = None,
+        valset_score: float | None = None,
     ) -> str | None:
-        """Publish a ProposedPrompt and return its ref URI."""
+        """Publish a GEPAPrompt and return its ref URI."""
         if not self.use_weave:
             return None
         try:
             import weave
 
-            from gepa.logging.prompt_tracker import ProposedPrompt
+            from gepa.logging.prompt_tracker import GEPAPrompt
 
-            prompt = ProposedPrompt(
+            prompt = GEPAPrompt(
                 content=content,
-                parent_ref=parent_ref,
                 iteration=iteration,
+                parent_ref=parent_ref,
                 minibatch_score_before=minibatch_score_before,
                 minibatch_score_after=minibatch_score_after,
                 accepted=accepted,
-            )
-            ref = weave.publish(prompt)
-            return str(ref.uri())
-        except Exception as e:
-            print(f"Warning: Failed to publish proposed prompt: {e}")
-            return None
-
-    def publish_accepted_prompt(
-        self,
-        proposed_ref: str,
-        candidate_idx: int,
-        valset_score: float,
-    ) -> str | None:
-        """Publish an AcceptedPrompt and return its ref URI."""
-        if not self.use_weave:
-            return None
-        try:
-            import weave
-
-            from gepa.logging.prompt_tracker import AcceptedPrompt
-
-            prompt = AcceptedPrompt(
-                proposed_ref=proposed_ref,
                 candidate_idx=candidate_idx,
                 valset_score=valset_score,
             )
             ref = weave.publish(prompt)
             ref_uri = str(ref.uri())
-            self._prompt_refs[candidate_idx] = ref_uri
+
+            if accepted and candidate_idx is not None:
+                self._prompt_refs[candidate_idx] = ref_uri
+
             return ref_uri
         except Exception as e:
-            print(f"Warning: Failed to publish accepted prompt: {e}")
+            print(f"Warning: Failed to publish prompt: {e}")
             return None
 
     def get_prompt_ref(self, candidate_idx: int) -> str | None:

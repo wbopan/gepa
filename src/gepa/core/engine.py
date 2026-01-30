@@ -352,20 +352,16 @@ class GEPAEngine(Generic[DataId, DataInst, Trajectory, RolloutOutput]):
         )
 
         # Publish seed prompt to weave
-        seed_proposed_ref = self.experiment_tracker.publish_proposed_prompt(
+        self.experiment_tracker.publish_prompt(
             content=self.seed_candidate,
             iteration=0,
             parent_ref=None,
             minibatch_score_before=0.0,
             minibatch_score_after=0.0,
             accepted=True,
+            candidate_idx=0,
+            valset_score=base_val_avg,
         )
-        if seed_proposed_ref:
-            self.experiment_tracker.publish_accepted_prompt(
-                proposed_ref=seed_proposed_ref,
-                candidate_idx=0,
-                valset_score=base_val_avg,
-            )
 
         # Register budget hook to fire on_budget_updated callback in real-time
         def budget_hook(new_total: int, delta: int) -> None:
@@ -523,8 +519,8 @@ class GEPAEngine(Generic[DataId, DataInst, Trajectory, RolloutOutput]):
                         f"Iteration {state.i + 1}: New subsample score {new_sum} is not better than old score {old_sum}, skipping",
                         header="reject",
                     )
-                    # Publish rejected ProposedPrompt
-                    self.experiment_tracker.publish_proposed_prompt(
+                    # Publish rejected prompt
+                    self.experiment_tracker.publish_prompt(
                         content=proposal.candidate,
                         iteration=state.i,
                         parent_ref=parent_ref,
@@ -550,16 +546,6 @@ class GEPAEngine(Generic[DataId, DataInst, Trajectory, RolloutOutput]):
                         header="accept",
                     )
 
-                # Publish accepted ProposedPrompt
-                proposed_ref = self.experiment_tracker.publish_proposed_prompt(
-                    content=proposal.candidate,
-                    iteration=state.i,
-                    parent_ref=parent_ref,
-                    minibatch_score_before=old_sum,
-                    minibatch_score_after=new_sum,
-                    accepted=True,
-                )
-
                 # Accept: full eval + add
                 new_idx, _ = self._run_full_eval_and_add(
                     new_program=proposal.candidate,
@@ -568,14 +554,18 @@ class GEPAEngine(Generic[DataId, DataInst, Trajectory, RolloutOutput]):
                 )
                 proposal_accepted = True
 
-                # Publish AcceptedPrompt with valset score
-                if proposed_ref:
-                    valset_score = self.val_evaluation_policy.get_valset_score(new_idx, state)
-                    self.experiment_tracker.publish_accepted_prompt(
-                        proposed_ref=proposed_ref,
-                        candidate_idx=new_idx,
-                        valset_score=valset_score,
-                    )
+                # Publish accepted prompt with valset score
+                valset_score = self.val_evaluation_policy.get_valset_score(new_idx, state)
+                self.experiment_tracker.publish_prompt(
+                    content=proposal.candidate,
+                    iteration=state.i,
+                    parent_ref=parent_ref,
+                    minibatch_score_before=old_sum,
+                    minibatch_score_after=new_sum,
+                    accepted=True,
+                    candidate_idx=new_idx,
+                    valset_score=valset_score,
+                )
 
                 # Notify candidate accepted
                 notify_callbacks(

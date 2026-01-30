@@ -129,32 +129,37 @@ class TestExperimentTrackerIntegration:
 
         # No errors should occur
 
-    def test_publish_proposed_prompt_no_weave(self):
-        """Test publishing proposed prompt with weave disabled (no-op)."""
+    def test_publish_prompt_no_weave(self):
+        """Test publishing prompt with weave disabled (no-op)."""
         tracker = ExperimentTracker(use_weave=False)
 
         with tracker:
             # Should return None and not raise any errors when weave is disabled
-            result = tracker.publish_proposed_prompt(
+            result = tracker.publish_prompt(
                 content={"system": "You are a helpful assistant."},
                 iteration=1,
                 parent_ref=None,
                 minibatch_score_before=0.5,
                 minibatch_score_after=0.7,
                 accepted=True,
+                candidate_idx=0,
+                valset_score=0.95,
             )
             assert result is None
 
-    def test_publish_accepted_prompt_no_weave(self):
-        """Test publishing accepted prompt with weave disabled (no-op)."""
+    def test_publish_rejected_prompt_no_weave(self):
+        """Test publishing rejected prompt with weave disabled (no-op)."""
         tracker = ExperimentTracker(use_weave=False)
 
         with tracker:
             # Should return None and not raise any errors when weave is disabled
-            result = tracker.publish_accepted_prompt(
-                proposed_ref="weave:///test/ref",
-                candidate_idx=0,
-                valset_score=0.95,
+            result = tracker.publish_prompt(
+                content={"system": "You are a helpful assistant."},
+                iteration=1,
+                parent_ref=None,
+                minibatch_score_before=0.5,
+                minibatch_score_after=0.3,
+                accepted=False,
             )
             assert result is None
 

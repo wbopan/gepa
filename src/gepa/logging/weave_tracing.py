@@ -10,9 +10,6 @@ works correctly because we use the native weave.op decorator.
 
 import weave
 
-# Re-export weave.op directly - this ensures proper call context propagation
-weave_op = weave.op
-
 
 def add_call_feedback(
     score: float | None = None,

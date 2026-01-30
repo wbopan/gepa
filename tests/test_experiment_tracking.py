@@ -9,9 +9,8 @@ from gepa.logging.experiment_tracker import ExperimentTracker, create_experiment
 def has_weave():
     """Check if weave and wandb are available."""
     try:
-        import weave  # noqa: F401
-
         import wandb  # noqa: F401
+        import weave  # noqa: F401
 
         return True
     except ImportError:
@@ -83,7 +82,7 @@ class TestExperimentTrackerIntegration:
 
         # Should work with context manager
         with tracker:
-            tracker.log_metrics({"test": 1.0}, step=1)
+            tracker.log_metrics({"test": 1.0}, iteration=1)
 
         assert not tracker.is_active()
 
@@ -93,8 +92,8 @@ class TestExperimentTrackerIntegration:
 
         # Test context manager workflow
         with tracker:
-            tracker.log_metrics({"loss": 0.5}, step=1)
-            tracker.log_metrics({"accuracy": 0.9}, step=2)
+            tracker.log_metrics({"loss": 0.5}, iteration=1)
+            tracker.log_metrics({"accuracy": 0.9}, iteration=2)
 
         # Should not be active after context exit
         assert not tracker.is_active()
@@ -105,7 +104,7 @@ class TestExperimentTrackerIntegration:
 
         with pytest.raises(ValueError):
             with tracker:
-                tracker.log_metrics({"test": 1.0}, step=1)
+                tracker.log_metrics({"test": 1.0}, iteration=1)
                 raise ValueError("test exception")
 
         # Should not be active after exception
@@ -117,15 +116,15 @@ class TestExperimentTrackerIntegration:
 
         with tracker:
             # Test different metric types
-            tracker.log_metrics({"loss": 0.5}, step=1)
-            tracker.log_metrics({"accuracy": 0.9, "f1": 0.85}, step=2)
-            tracker.log_metrics({"learning_rate": 0.001}, step=3)
+            tracker.log_metrics({"loss": 0.5}, iteration=1)
+            tracker.log_metrics({"accuracy": 0.9, "f1": 0.85}, iteration=2)
+            tracker.log_metrics({"learning_rate": 0.001}, iteration=3)
 
             # Test without step
             tracker.log_metrics({"final_loss": 0.1})
 
             # Test with None step
-            tracker.log_metrics({"test_metric": 42}, step=None)
+            tracker.log_metrics({"test_metric": 42}, iteration=None)
 
         # No errors should occur
 
@@ -192,7 +191,7 @@ class TestExperimentTrackerIntegration:
 
         # Should not raise any errors
         tracker.start_run()
-        tracker.log_metrics({"test": 1.0}, step=1)
+        tracker.log_metrics({"test": 1.0}, iteration=1)
         tracker.end_run()
 
         assert not tracker.is_active()

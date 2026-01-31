@@ -849,7 +849,9 @@ name = "gepa"
 version = "0.0.27"
 source = { editable = "." }
 dependencies = [
+    { name = "gql" },
     { name = "litellm" },
+    { name = "redis" },
     { name = "rich" },
     { name = "tenacity" },
     { name = "weave", extra = ["litellm"] },
@@ -912,6 +914,7 @@ requires-dist = [
     { name = "gepa", extras = ["build"], marker = "extra == 'dev'" },
     { name = "gepa", extras = ["full"], marker = "extra == 'test'" },
     { name = "gepa", extras = ["test"], marker = "extra == 'dev'" },
+    { name = "gql", specifier = ">=4.0.0" },
     { name = "litellm", specifier = ">=1.81.5" },
     { name = "litellm", extras = ["caching"], marker = "python_full_version >= '3.14' and extra == 'full'", specifier = ">=1.81.0" },
     { name = "litellm", extras = ["caching"], marker = "python_full_version < '3.14' and extra == 'full'", specifier = ">=1.64.0" },
@@ -921,6 +924,7 @@ requires-dist = [
     { name = "pydantic", marker = "python_full_version >= '3.14' and extra == 'full'", specifier = ">=2.12.0" },
     { name = "pyright", marker = "extra == 'test'" },
     { name = "pytest", marker = "extra == 'test'" },
+    { name = "redis", specifier = ">=7.1.0" },
     { name = "requests", marker = "extra == 'build'" },
     { name = "rich", specifier = ">=13.0.0" },
     { name = "ruff", marker = "extra == 'dev'", specifier = ">=0.3.0" },
@@ -985,11 +989,11 @@ requests = [
 
 [[package]]
 name = "graphql-core"
-version = "3.2.7"
+version = "3.2.6"
 source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/ac/9b/037a640a2983b09aed4a823f9cf1729e6d780b0671f854efa4727a7affbe/graphql_core-3.2.7.tar.gz", hash = "sha256:27b6904bdd3b43f2a0556dad5d579bdfdeab1f38e8e8788e555bdcb586a6f62c", size = 513484 }
+sdist = { url = "https://files.pythonhosted.org/packages/c4/16/7574029da84834349b60ed71614d66ca3afe46e9bf9c7b9562102acb7d4f/graphql_core-3.2.6.tar.gz", hash = "sha256:c08eec22f9e40f0bd61d805907e3b3b1b9a320bc606e23dc145eebca07c8fbab", size = 505353 }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/0a/14/933037032608787fb92e365883ad6a741c235e0ff992865ec5d904a38f1e/graphql_core-3.2.7-py3-none-any.whl", hash = "sha256:17fc8f3ca4a42913d8e24d9ac9f08deddf0a0b2483076575757f6c412ead2ec0", size = 207262 },
+    { url = "https://files.pythonhosted.org/packages/ae/4f/7297663840621022bc73c22d7d9d80dbc78b4db6297f764b545cd5dd462d/graphql_core-3.2.6-py3-none-any.whl", hash = "sha256:78b016718c161a6fb20a7d97bbf107f331cd1afe53e45566c59f776ed7f0b45f", size = 203416 },
 ]
 
 [[package]]
@@ -2808,6 +2812,18 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/5a/a9/104ec9234c8448c4379768221ea6df01260cd6c2ce13182d4eac531c8342/readme_renderer-44.0.tar.gz", hash = "sha256:8712034eabbfa6805cacf1402b4eeb2a73028f72d1166d6f5cb7f9c047c5d1e1", size = 32056 }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/e1/67/921ec3024056483db83953ae8e48079ad62b92db7880013ca77632921dd0/readme_renderer-44.0-py3-none-any.whl", hash = "sha256:2fbca89b81a08526aadf1357a8c2ae889ec05fb03f5da67f9769c9a592166151", size = 13310 },
+]
+
+[[package]]
+name = "redis"
+version = "7.1.0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "async-timeout", marker = "python_full_version < '3.11.3'" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/43/c8/983d5c6579a411d8a99bc5823cc5712768859b5ce2c8afe1a65b37832c81/redis-7.1.0.tar.gz", hash = "sha256:b1cc3cfa5a2cb9c2ab3ba700864fb0ad75617b41f01352ce5779dabf6d5f9c3c", size = 4796669 }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/89/f0/8956f8a86b20d7bb9d6ac0187cf4cd54d8065bc9a1a09eb8011d4d326596/redis-7.1.0-py3-none-any.whl", hash = "sha256:23c52b208f92b56103e17c5d06bdc1a6c2c0b3106583985a76a18f83b265de2b", size = 354159 },
 ]
 
 [[package]]

@@ -32,12 +32,13 @@ class RichLogger(LoggerProtocol):
         self._debug_enabled = os.environ.get("LOG_LEVEL", "").upper() == "DEBUG"
         self._indent_level = indent_level
 
-    def log(self, message: str, header: str | None = None):
+    def log(self, message: str, header: str | None = None, flush: bool = False):
         """Log a message with optional colored header.
 
         Args:
             message: The message to log.
             header: Optional header text that will be uppercased and colored.
+            flush: Whether to force flush stdout after logging.
         """
         indent = "  " * self._indent_level
         if header:
@@ -46,16 +47,19 @@ class RichLogger(LoggerProtocol):
             self.console.print(f"{indent}{formatted_header} {message}")
         else:
             self.console.print(f"{indent}{message}")
+        if flush:
+            sys.stdout.flush()
 
-    def debug(self, message: str, header: str | None = None):
+    def debug(self, message: str, header: str | None = None, flush: bool = True):
         """Log a debug message (only shown when LOG_LEVEL=DEBUG).
 
         Args:
             message: The message to log.
             header: Optional header text that will be uppercased and colored.
+            flush: Whether to force flush stdout after logging (default True for debug).
         """
         if self._debug_enabled:
-            self.log(message, header=header)
+            self.log(message, header=header, flush=flush)
 
     def show(self, content: str, title: str | None = None):
         """Display content using a rich panel.

@@ -8,28 +8,28 @@ from typing import Any, Literal
 
 
 def configure_cache(
-    backend: Literal["disk", "r2", "redis", "s3"] = "r2",
+    backend: Literal["disk", "r2", "redis", "s3"] = "redis",
     **kwargs: Any,
 ) -> None:
     """Configure LiteLLM cache.
 
     Args:
         backend: Cache backend type
-            - "r2": Cloudflare R2 (default, reads from R2_* env vars)
+            - "redis": Redis cache (default, reads from REDIS_HOST, REDIS_PORT, REDIS_PASSWORD env vars)
             - "disk": Local disk cache
-            - "redis": Redis cache
+            - "r2": Cloudflare R2 (reads from R2_* env vars)
             - "s3": AWS S3 or compatible
         **kwargs: Additional arguments passed to litellm.Cache()
 
     Examples:
-        # Cloudflare R2 (default, set R2_BUCKET_NAME, R2_ENDPOINT_URL, R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY)
-        configure_cache("r2")
+        # Redis (default, set REDIS_HOST, REDIS_PORT, REDIS_PASSWORD)
+        configure_cache("redis")
 
         # Disk cache
         configure_cache("disk")
 
-        # Custom S3
-        configure_cache("s3", s3_bucket_name="my-bucket", s3_region_name="us-west-2")
+        # Cloudflare R2 (set R2_BUCKET_NAME, R2_ENDPOINT_URL, R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY)
+        configure_cache("r2")
     """
     import litellm
     from litellm import Cache
@@ -50,7 +50,15 @@ def configure_cache(
         )
 
     elif backend == "redis":
-        litellm.cache = Cache(type="redis", **kwargs)
+        litellm.cache = Cache(
+            type="redis",
+            host=kwargs.pop("host", os.environ.get("REDIS_HOST")),
+            port=kwargs.pop("port", int(os.environ.get("REDIS_PORT", "6379"))),
+            password=kwargs.pop("password", os.environ.get("REDIS_PASSWORD")),
+            ssl=kwargs.pop("ssl", True),  # Upstash requires TLS
+            ttl=kwargs.pop("ttl", 60 * 60 * 24 * 180),  # Default: 180 days (litellm defaults to 60s)
+            **kwargs,
+        )
 
     elif backend == "s3":
         litellm.cache = Cache(type="s3", **kwargs)

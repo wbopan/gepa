@@ -612,7 +612,17 @@ class VerboseCallback:
             )
 
 
-class LiteLLMCacheLogger:
+def _get_litellm_base_class() -> type:
+    """Get the base class for LiteLLM callbacks."""
+    try:
+        from litellm.integrations.custom_logger import CustomLogger
+
+        return CustomLogger
+    except ImportError:
+        return object
+
+
+class LiteLLMCacheLogger(_get_litellm_base_class()):
     """Logs LiteLLM request timing and cache hits/misses.
 
     This callback integrates with LiteLLM's callback system to provide
@@ -646,16 +656,28 @@ class LiteLLMCacheLogger:
             litellm.callbacks.append(instance)
         return instance
 
-    def log_pre_api_call(self, model: str, _messages: Any, _kwargs: Any) -> None:
+    def log_pre_api_call(self, model: str, messages: Any = None, kwargs: Any = None, **extra: Any) -> None:
         """Called before each API request is sent."""
         from datetime import datetime
 
         self._logger.debug(f"[{datetime.now().strftime('%H:%M:%S.%f')[:-3]}] {model}", header="request")
 
-    def log_success_event(self, kwargs: Any, _response_obj: Any, start_time: Any, end_time: Any) -> None:
+    def log_success_event(  # noqa: PLR0913
+        self,
+        kwargs: Any,
+        response_obj: Any = None,
+        start_time: Any = None,
+        end_time: Any = None,
+        **extra: Any,
+    ) -> None:
         """Called when a request completes successfully."""
-        cache_hit = kwargs.get("cache_hit", False)
+        cache_hit = kwargs.get("cache_hit")
         model = kwargs.get("model", "unknown")
-        duration = (end_time - start_time).total_seconds()
-        header = "cache hit" if cache_hit else "cache miss"
-        self._logger.debug(f"[{end_time.strftime('%H:%M:%S.%f')[:-3]}] {model} ({duration:.2f}s)", header=header)
+        if start_time and end_time:
+            duration = (end_time - start_time).total_seconds()
+            self._logger.debug(
+                f"[{end_time.strftime('%H:%M:%S.%f')[:-3]}] {model} ({duration:.2f}s)",
+                header="cache hit" if cache_hit else "cache miss",
+            )
+        else:
+            self._logger.debug(f"{model}", header="cache hit" if cache_hit else "cache miss")

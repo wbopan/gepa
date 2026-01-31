@@ -80,7 +80,7 @@ def optimize(
     cache_evaluation: bool = False,
     # LiteLLM cache configuration
     auto_configure_cache: bool = True,
-    cache_type: Literal["disk", "r2", "redis", "s3"] = "r2",
+    cache_type: Literal["disk", "r2", "redis", "s3"] = "redis",
     # Reproducibility
     seed: int = 0,
     raise_on_exception: bool = True,
@@ -166,7 +166,7 @@ def optimize(
 
     # LiteLLM cache configuration
     - auto_configure_cache: Whether to automatically configure LiteLLM caching if not already configured. Defaults to True. Set to False if you want to configure caching manually or disable it entirely.
-    - cache_type: The type of cache to use when auto_configure_cache is True. Supported values: 'disk', 'r2', 'redis', 's3'. Defaults to 'disk'.
+    - cache_type: The type of cache to use when auto_configure_cache is True. Supported values: 'disk', 'r2', 'redis', 's3'. Defaults to 'redis'.
 
     # Reproducibility
     - seed: The seed to use for the random number generator.

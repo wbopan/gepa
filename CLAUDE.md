@@ -80,6 +80,7 @@ The codebase uses TypeVars (`DataInst`, `Trajectory`, `RolloutOutput`) allowing 
 - Ruff for linting/formatting (line length: 120)
 - Relative imports banned (except in tests)
 - Type checking with Pyright (standard mode)
+- All comments must be written in English
 
 ## Development Guidelines
 

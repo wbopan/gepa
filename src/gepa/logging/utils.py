@@ -23,15 +23,15 @@ def log_iteration_metrics(
     best_score = val_evaluation_policy.get_valset_score(best_program_idx, gepa_state)
 
     metrics = {
-        "valset_pareto_front_agg": pareto_avg,
-        "best_valset_agg_score": best_score,
-        "best_program_idx": best_program_idx,
-        "num_candidates": len(gepa_state.program_candidates),
+        "pareto/val_agg": pareto_avg,
+        "val/best_agg": best_score,
+        "candidate/best_idx": best_program_idx,
+        "candidate/count": len(gepa_state.program_candidates),
     }
 
     if gepa_state.objective_pareto_front:
         objective_pareto_scores = list(gepa_state.objective_pareto_front.values())
-        metrics["objective_pareto_front_agg"] = sum(objective_pareto_scores) / len(objective_pareto_scores)
+        metrics["objective/pareto_agg"] = sum(objective_pareto_scores) / len(objective_pareto_scores)
 
     experiment_tracker.log_metrics(metrics, iteration=gepa_state.i)
 
@@ -124,29 +124,29 @@ def log_detailed_metrics_after_discovering_new_program(
 
     # Only log new-program-specific metrics here; core metrics are logged by log_iteration_metrics
     metrics = {
-        "new_program_idx": new_program_idx,
-        "valset_pareto_front_programs": {k: list(v) for k, v in gepa_state.program_at_pareto_front_valset.items()},
-        "linear_pareto_front_program_idx": linear_pareto_front_program_idx,
-        "val_evaluated_count_new_program": coverage,
-        "val_total_count": valset_size,
-        "val_program_average": valset_score,
+        "candidate/new_idx": new_program_idx,
+        "pareto/val_candidates": {k: list(v) for k, v in gepa_state.program_at_pareto_front_valset.items()},
+        "pareto/linear_best_idx": linear_pareto_front_program_idx,
+        "val/eval_count": coverage,
+        "val/total": valset_size,
+        "val/new_score": valset_score,
     }
     if log_individual_valset_scores_and_programs:
         metrics.update(
             {
-                "valset_pareto_front_scores": dict(gepa_state.pareto_front_valset),
-                "individual_valset_score_new_program": dict(valset_scores),
+                "pareto/val_scores": dict(gepa_state.pareto_front_valset),
+                "val/new_scores": dict(valset_scores),
             }
         )
     if objective_scores:
-        metrics["objective_scores_new_program"] = dict(objective_scores)
+        metrics["objective/new_scores"] = dict(objective_scores)
     if valset_evaluation.objective_scores_by_val_id:
-        metrics["objective_scores_by_val_new_program"] = {
+        metrics["objective/new_scores_by_val"] = {
             val_id: dict(scores) for val_id, scores in valset_evaluation.objective_scores_by_val_id.items()
         }
     if gepa_state.objective_pareto_front:
-        metrics["objective_pareto_front_scores"] = dict(gepa_state.objective_pareto_front)
-        metrics["objective_pareto_front_programs"] = {
+        metrics["objective/pareto_scores"] = dict(gepa_state.objective_pareto_front)
+        metrics["objective/pareto_candidates"] = {
             k: list(v) for k, v in gepa_state.program_at_pareto_front_objectives.items()
         }
 

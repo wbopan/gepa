@@ -141,9 +141,9 @@ class AdaBoostBatchSampler(BatchSampler[DataId, DataInst]):
             return None
         weights = list(self._weights.values())
         return {
-            "train_sample_weight_avg": sum(weights) / len(weights),
-            "train_sample_weight_max": max(weights),
-            "train_sample_weight_min": min(weights),
+            "train/weight_avg": sum(weights) / len(weights),
+            "train/weight_max": max(weights),
+            "train/weight_min": min(weights),
         }
 
 
@@ -326,7 +326,7 @@ class PMaxBatchSampler(BatchSampler[DataId, DataInst]):
             return None
         all_weights = list(self._weights.values())
         return {
-            "train_sample_weight_avg": sum(all_weights) / len(all_weights),
-            "train_sample_weight_max": max(all_weights),
-            "train_sample_weight_min": min(all_weights),
+            "train/weight_avg": sum(all_weights) / len(all_weights),
+            "train/weight_max": max(all_weights),
+            "train/weight_min": min(all_weights),
         }

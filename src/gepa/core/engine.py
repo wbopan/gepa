@@ -322,8 +322,8 @@ class GEPAEngine(Generic[DataId, DataInst, Trajectory, RolloutOutput]):
         base_val_avg, base_val_coverage = state.get_program_average_val_subset(0)
         self.experiment_tracker.log_summary(
             {
-                "base_program_full_valset_score": base_val_avg,
-                "base_program_val_coverage": base_val_coverage,
+                "seed/val_score": base_val_avg,
+                "seed/val_coverage": base_val_coverage,
             }
         )
 

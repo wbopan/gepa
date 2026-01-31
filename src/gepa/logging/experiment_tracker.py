@@ -155,11 +155,11 @@ class ExperimentTracker:
         """Save final optimization results to wandb summary."""
         self.log_summary(
             {
-                "best_candidate_idx": best_candidate_idx,
-                "best_score": best_score,
-                "total_candidates": total_candidates,
-                "total_metric_calls": total_metric_calls,
-                "best_candidate": best_candidate,
+                "candidate/best_idx": best_candidate_idx,
+                "candidate/best_score": best_score,
+                "candidate/total": total_candidates,
+                "candidate/total_evals": total_metric_calls,
+                "candidate/best": best_candidate,
             }
         )
 

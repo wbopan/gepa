@@ -294,6 +294,130 @@ class TestBayesianBatchSampler:
         assert sampler.get_scores()[2] == 1.0
 
 
+class TestBayesianBatchSamplerWindow:
+    """Tests for the window parameter of BayesianBatchSampler."""
+
+    def test_window_none_uses_all_history(self):
+        """Test that window=None (default) uses all history."""
+        sampler = BayesianBatchSampler(minibatch_size=2, window=None)
+        loader = MockDataLoader([0, 1])
+        state = MockGEPAState()
+
+        sampler.next_minibatch_ids(loader, state)
+
+        # Add 4 traces
+        state.full_program_trace.append({"subsample_ids": [0, 1], "subsample_scores": [0.6, 0.4]})
+        state.full_program_trace.append({"subsample_ids": [0, 1], "subsample_scores": [0.6, 0.4]})
+        state.full_program_trace.append({"subsample_ids": [0, 1], "subsample_scores": [0.6, 0.4]})
+        state.full_program_trace.append({"subsample_ids": [0, 1], "subsample_scores": [0.6, 0.4]})
+
+        sampler.next_minibatch_ids(loader, state)
+        counts = sampler.get_counts()
+
+        # All 4 traces should be counted
+        assert counts[0] == (4, 0)  # 4 successes
+        assert counts[1] == (0, 4)  # 4 failures
+
+    def test_window_limits_history(self):
+        """Test that window limits history to recent traces only."""
+        sampler = BayesianBatchSampler(minibatch_size=2, window=2)
+        loader = MockDataLoader([0, 1])
+        state = MockGEPAState()
+
+        sampler.next_minibatch_ids(loader, state)
+
+        # Add 4 traces - sample 0 starts failing, sample 1 starts succeeding
+        # Trace 0: sample 0 success, sample 1 failure
+        state.full_program_trace.append({"subsample_ids": [0, 1], "subsample_scores": [0.6, 0.4]})
+        # Trace 1: sample 0 success, sample 1 failure
+        state.full_program_trace.append({"subsample_ids": [0, 1], "subsample_scores": [0.6, 0.4]})
+        # Trace 2: sample 0 failure, sample 1 success
+        state.full_program_trace.append({"subsample_ids": [0, 1], "subsample_scores": [0.4, 0.6]})
+        # Trace 3: sample 0 failure, sample 1 success
+        state.full_program_trace.append({"subsample_ids": [0, 1], "subsample_scores": [0.4, 0.6]})
+
+        sampler.next_minibatch_ids(loader, state)
+        counts = sampler.get_counts()
+
+        # With window=2, only traces 2 and 3 are counted
+        # Sample 0: 0 successes, 2 failures (traces 2, 3)
+        # Sample 1: 2 successes, 0 failures (traces 2, 3)
+        assert counts[0] == (0, 2)
+        assert counts[1] == (2, 0)
+
+    def test_window_allows_weight_recovery(self):
+        """Test that samples can regain priority when recent candidates solve them."""
+        sampler = BayesianBatchSampler(minibatch_size=2, window=2)
+        loader = MockDataLoader([0, 1])
+        state = MockGEPAState()
+
+        sampler.next_minibatch_ids(loader, state)
+
+        # Initially sample 0 always succeeds, sample 1 always fails
+        state.full_program_trace.append({"subsample_ids": [0, 1], "subsample_scores": [0.9, 0.3]})
+        state.full_program_trace.append({"subsample_ids": [0, 1], "subsample_scores": [0.9, 0.3]})
+
+        sampler.next_minibatch_ids(loader, state)
+        counts_after_initial = sampler.get_counts()
+
+        # Sample 0 has (2, 0) in window -> one-sided success
+        # Sample 1 has (0, 2) in window -> one-sided failure
+        assert counts_after_initial[0] == (2, 0)
+        assert counts_after_initial[1] == (0, 2)
+
+        # Now sample 0 starts failing, sample 1 starts succeeding
+        state.full_program_trace.append({"subsample_ids": [0, 1], "subsample_scores": [0.3, 0.9]})
+        state.full_program_trace.append({"subsample_ids": [0, 1], "subsample_scores": [0.3, 0.9]})
+
+        sampler.next_minibatch_ids(loader, state)
+        counts_after_change = sampler.get_counts()
+
+        # With window=2, only traces 2, 3 are counted now
+        # Sample 0: (0, 2) -> one-sided failure (old successes forgotten!)
+        # Sample 1: (2, 0) -> one-sided success (old failures forgotten!)
+        # The key is that both samples' old outcomes are forgotten
+        assert counts_after_change[0] == (0, 2)  # Old successes forgotten
+        assert counts_after_change[1] == (2, 0)  # Old failures forgotten
+
+    def test_window_one_uses_only_latest_trace(self):
+        """Test that window=1 uses only the most recent trace."""
+        sampler = BayesianBatchSampler(minibatch_size=2, window=1)
+        loader = MockDataLoader([0])
+        state = MockGEPAState()
+
+        sampler.next_minibatch_ids(loader, state)
+
+        # Add multiple traces with alternating outcomes
+        state.full_program_trace.append({"subsample_ids": [0], "subsample_scores": [0.6]})  # success
+        state.full_program_trace.append({"subsample_ids": [0], "subsample_scores": [0.4]})  # failure
+        state.full_program_trace.append({"subsample_ids": [0], "subsample_scores": [0.6]})  # success
+
+        sampler.next_minibatch_ids(loader, state)
+        counts = sampler.get_counts()
+
+        # With window=1, only trace 2 (last one) counts
+        assert counts[0] == (1, 0)  # Only the last success
+
+    def test_window_larger_than_history_uses_all(self):
+        """Test that window larger than trace count uses all available traces."""
+        sampler = BayesianBatchSampler(minibatch_size=2, window=10)
+        loader = MockDataLoader([0])
+        state = MockGEPAState()
+
+        sampler.next_minibatch_ids(loader, state)
+
+        # Add only 3 traces
+        state.full_program_trace.append({"subsample_ids": [0], "subsample_scores": [0.6]})
+        state.full_program_trace.append({"subsample_ids": [0], "subsample_scores": [0.6]})
+        state.full_program_trace.append({"subsample_ids": [0], "subsample_scores": [0.4]})
+
+        sampler.next_minibatch_ids(loader, state)
+        counts = sampler.get_counts()
+
+        # Window=10 but only 3 traces exist, so all are counted
+        assert counts[0] == (2, 1)
+
+
 class TestResidualSamplerIntegration:
     """Tests for ResidualWeightedSampler integration."""
 

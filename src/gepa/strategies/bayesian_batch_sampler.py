@@ -53,13 +53,21 @@ class BayesianBatchSampler(BatchSampler[DataId, DataInst]):
         - Cold start (0, 0): max priority 1.0, explore unknown samples
         - Frontier (s ≈ f): max priority, samples where candidates disagree most
         - Confident (s >> f or f >> s): low priority, already determined
+
+    Args:
+        minibatch_size: Number of samples to return per batch.
+        binarize_threshold: Score threshold for classifying as success (>= threshold).
+        window: If set, only consider the most recent `window` trace entries when
+            computing success/failure counts. None means use all history (default).
+            This allows samples to regain priority when newer candidates can solve
+            previously hard samples.
     """
 
     minibatch_size: int
     binarize_threshold: float = 0.5  # score >= threshold counts as success
+    window: int | None = None  # sliding window for recent traces
 
-    _successes: dict[DataId, int] = field(default_factory=dict)
-    _failures: dict[DataId, int] = field(default_factory=dict)
+    _outcome_history: dict[DataId, list[tuple[int, bool]]] = field(default_factory=dict)
     _scores: dict[DataId, float] = field(default_factory=dict)
     _last_processed_trace_idx: int = field(default=-1)
     _last_sampled_ids: list[DataId] = field(default_factory=list)
@@ -77,7 +85,7 @@ class BayesianBatchSampler(BatchSampler[DataId, DataInst]):
         return self._sample_from_residual(all_ids)
 
     def _update_counts_from_state(self, state: GEPAState) -> None:
-        """Update success/failure counts based on new trace entries."""
+        """Update outcome history based on new trace entries."""
         for trace_idx in range(self._last_processed_trace_idx + 1, len(state.full_program_trace)):
             trace = state.full_program_trace[trace_idx]
             subsample_ids = trace.get("subsample_ids")
@@ -88,18 +96,48 @@ class BayesianBatchSampler(BatchSampler[DataId, DataInst]):
                 break
 
             for data_id, score in zip(subsample_ids, subsample_scores, strict=False):
-                if score >= self.binarize_threshold:
-                    self._successes[data_id] = self._successes.get(data_id, 0) + 1
-                else:
-                    self._failures[data_id] = self._failures.get(data_id, 0) + 1
+                is_success = score >= self.binarize_threshold
+                if data_id not in self._outcome_history:
+                    self._outcome_history[data_id] = []
+                self._outcome_history[data_id].append((trace_idx, is_success))
 
             self._last_processed_trace_idx = trace_idx
+
+    def _get_windowed_counts(self, data_id: DataId) -> tuple[int, int]:
+        """Get success/failure counts within the window.
+
+        Args:
+            data_id: The sample ID to get counts for.
+
+        Returns:
+            Tuple of (successes, failures) within the window.
+        """
+        history = self._outcome_history.get(data_id, [])
+        if not history:
+            return (0, 0)
+
+        if self.window is None:
+            # Use all history
+            successes = sum(1 for _, is_success in history if is_success)
+            failures = len(history) - successes
+            return (successes, failures)
+
+        # Only count entries within window
+        cutoff = self._last_processed_trace_idx - self.window + 1
+        successes = 0
+        failures = 0
+        for trace_idx, is_success in history:
+            if trace_idx >= cutoff:
+                if is_success:
+                    successes += 1
+                else:
+                    failures += 1
+        return (successes, failures)
 
     def _compute_scores(self, all_ids: Sequence[DataId]) -> None:
         """Compute frontier scores for all samples."""
         for data_id in all_ids:
-            s = self._successes.get(data_id, 0)
-            f = self._failures.get(data_id, 0)
+            s, f = self._get_windowed_counts(data_id)
             self._scores[data_id] = bayesian_frontier_score(s, f)
 
     def _update_residual_sampler(self, all_ids: Sequence[DataId]) -> None:
@@ -141,9 +179,8 @@ class BayesianBatchSampler(BatchSampler[DataId, DataInst]):
         return dict(self._scores)
 
     def get_counts(self) -> dict[DataId, tuple[int, int]]:
-        """Return (successes, failures) counts for each sample."""
-        all_ids = set(self._successes.keys()) | set(self._failures.keys())
-        return {data_id: (self._successes.get(data_id, 0), self._failures.get(data_id, 0)) for data_id in all_ids}
+        """Return (successes, failures) counts for each sample within the window."""
+        return {data_id: self._get_windowed_counts(data_id) for data_id in self._outcome_history}
 
     def get_last_sampled_avg_weight(self) -> float:
         """Return the average frontier score of the most recently sampled batch."""

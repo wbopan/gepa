@@ -18,6 +18,9 @@ class ExperimentTracker:
         self.use_weave = use_weave
         self.weave_project_name = weave_project_name or "gepa-boost"
         self._prompt_refs: dict[int, str] = {}  # candidate_idx -> AcceptedPrompt ref
+        # Table data accumulation for candidate logging
+        self._prompts_rows: list[list[Any]] = []
+        self._outputs_rows: list[list[Any]] = []
 
     def __enter__(self):
         self.start_run()
@@ -159,6 +162,72 @@ class ExperimentTracker:
                 "best_candidate": best_candidate,
             }
         )
+
+    def add_candidate_to_tables(
+        self,
+        candidate_idx: int,
+        candidate: dict[str, str],
+        subscores: dict[Any, float],
+        valset_aggregate_score: float,
+        parent_idx: int | None,
+        metric_calls_at_discovery: int,
+        evaluation_cache: Any,
+        valset_inputs: dict[Any, Any],
+    ) -> None:
+        """Add a newly accepted candidate's rows to the tables."""
+        if not self.use_weave:
+            return
+        import json
+
+        # prompts table: one row per candidate
+        self._prompts_rows.append(
+            [
+                candidate_idx,
+                valset_aggregate_score,
+                parent_idx,
+                metric_calls_at_discovery,
+                json.dumps(candidate),
+            ]
+        )
+
+        # outputs table: one row per (candidate, val_id)
+        for val_id, score in subscores.items():
+            cached = evaluation_cache.get(candidate, val_id) if evaluation_cache else None
+            output = cached.output if cached else None
+            input_data = valset_inputs.get(val_id)
+            self._outputs_rows.append(
+                [
+                    candidate_idx,
+                    str(val_id),
+                    json.dumps(candidate),
+                    json.dumps(input_data, default=str) if input_data is not None else None,
+                    json.dumps(output, default=str) if output is not None else None,
+                    score,
+                ]
+            )
+
+    def log_tables(self) -> None:
+        """Log the accumulated tables to wandb."""
+        if not self.use_weave or not self._prompts_rows:
+            return
+        try:
+            import wandb
+
+            prompts_columns = [
+                "candidate_idx",
+                "valset_aggregate_score",
+                "parent_idx",
+                "metric_calls_at_discovery",
+                "candidate_content",
+            ]
+            prompts_table = wandb.Table(data=self._prompts_rows, columns=prompts_columns)
+
+            outputs_columns = ["candidate_idx", "val_id", "candidate_content", "input", "output", "score"]
+            outputs_table = wandb.Table(data=self._outputs_rows, columns=outputs_columns)
+
+            wandb.log({"candidate_prompts": prompts_table, "candidate_outputs": outputs_table})
+        except Exception as e:
+            print(f"Warning: Failed to log tables: {e}")
 
 
 def create_experiment_tracker(

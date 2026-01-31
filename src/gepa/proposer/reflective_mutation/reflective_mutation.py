@@ -356,4 +356,10 @@ class ReflectiveMutationProposer(ProposeNewCandidate[DataId]):
             subsample_scores_before=eval_curr.scores,
             subsample_scores_after=new_scores,
             tag="reflective_mutation",
+            metadata={
+                "iteration_id": i,
+                "subsample_score_before": sum(eval_curr.scores),
+                "subsample_score_after": new_sum,
+                "accepted": new_sum > sum(eval_curr.scores),
+            },
         )

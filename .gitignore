@@ -210,3 +210,6 @@ runs/
 gepa_terminus/
 mlruns/
 wandb/
+
+# Git worktrees
+worktrees/

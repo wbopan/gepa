@@ -236,6 +236,22 @@ class GEPAEngine(Generic[DataId, DataInst, Trajectory, RolloutOutput]):
             valset_size=len(valset),
             val_evaluation_policy=self.val_evaluation_policy,
         )
+
+        # Add new candidate to wandb tables
+        all_val_ids = list(valset_evaluation.scores_by_val_id.keys())
+        valset_inputs = {vid: inst for vid, inst in zip(all_val_ids, valset.fetch(all_val_ids), strict=False)}
+        self.experiment_tracker.add_candidate_to_tables(
+            candidate_idx=new_program_idx,
+            candidate=new_program,
+            subscores=dict(valset_evaluation.scores_by_val_id),
+            valset_aggregate_score=valset_score,
+            parent_idx=parent_program_idx[0] if parent_program_idx else None,
+            metric_calls_at_discovery=state.num_metric_calls_by_discovery[new_program_idx],
+            evaluation_cache=state.evaluation_cache,
+            valset_inputs=valset_inputs,
+        )
+        self.experiment_tracker.log_tables()
+
         return new_program_idx, linear_pareto_front_program_idx
 
     @weave.op(name="gepa.optimization")
@@ -385,6 +401,23 @@ class GEPAEngine(Generic[DataId, DataInst, Trajectory, RolloutOutput]):
             valset_size=len(valset),
             val_evaluation_policy=self.val_evaluation_policy,
         )
+
+        # Add seed candidate to wandb tables
+        all_seed_val_ids = list(seed_scores.keys())
+        seed_valset_inputs = {
+            vid: inst for vid, inst in zip(all_seed_val_ids, valset.fetch(all_seed_val_ids), strict=False)
+        }
+        self.experiment_tracker.add_candidate_to_tables(
+            candidate_idx=0,
+            candidate=self.seed_candidate,
+            subscores=dict(seed_scores),
+            valset_aggregate_score=base_val_avg,
+            parent_idx=None,
+            metric_calls_at_discovery=state.num_metric_calls_by_discovery[0],
+            evaluation_cache=state.evaluation_cache,
+            valset_inputs=seed_valset_inputs,
+        )
+        self.experiment_tracker.log_tables()
 
         # Register budget hook to fire on_budget_updated callback in real-time
         def budget_hook(new_total: int, delta: int) -> None:

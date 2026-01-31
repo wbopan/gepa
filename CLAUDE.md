@@ -87,4 +87,5 @@ When modifying existing code or adding new features:
 
 - **Breaking changes allowed**: Feel free to make breaking changes without considering backward compatibility.
 - **Minimize changes**: Make the smallest possible modification that achieves the goal. Avoid refactoring unrelated code or adding unnecessary abstractions.
-- **Follow existing patterns**: Study how similar functionality is implemented elsewhere in the codebase and mirror those conventions. For example:
+- **Follow existing patterns**: Study how similar functionality is implemented elsewhere in the codebase and mirror those conventions.
+- **Logging**: Use `get_logger()` from `gepa.logging` instead of Python's built-in `logging` or `print()`. Use `logger.log(msg, header="...")` for important messages with semantic headers (e.g., `"select"`, `"score"`, `"error"`), and `logger.debug()` for verbose output (enabled via `LOG_LEVEL=DEBUG`).

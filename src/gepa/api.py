@@ -186,6 +186,16 @@ def optimize(
 
             configure_cache(cache_type)
 
+        # Configure shared HTTP client to prevent "too many open files" error
+        # See: https://github.com/BerriAI/litellm/issues/1070
+        if litellm.client_session is None:
+            import httpx
+
+            litellm.client_session = httpx.Client(
+                timeout=httpx.Timeout(600.0, connect=10.0),
+                limits=httpx.Limits(max_connections=100, max_keepalive_connections=20),
+            )
+
     active_adapter: GEPAAdapter[DataInst, Trajectory, RolloutOutput] | None = None
     if adapter is None:
         assert task_lm is not None, (

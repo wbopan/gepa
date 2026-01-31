@@ -10,7 +10,7 @@ GEPA (Genetic-Pareto) is a Python framework for optimizing text components of sy
 
 ```bash
 # Setup (using uv - recommended)
-uv sync --extra dev --python 3.11
+uv sync --all-extras --python 3.11
 
 # Run all tests
 uv run pytest tests/

@@ -7,6 +7,7 @@ from collections import Counter
 import pytest
 
 from gepa.strategies.adaboost_sampler import AdaBoostBatchSampler, PMaxBatchSampler
+from gepa.strategies.batch_sampler import MetricLoggingBatchSampler
 
 
 class MockDataLoader:
@@ -216,29 +217,57 @@ class TestAdaBoostBatchSampler:
         with pytest.raises(ValueError, match="Cannot sample from empty loader"):
             sampler.next_minibatch_ids(loader, state)
 
-    def test_get_last_sampled_avg_weight(self):
-        """Test get_last_sampled_avg_weight returns correct average."""
+    def test_get_batch_weights(self):
+        """Test get_batch_weights returns correct weights."""
         sampler = AdaBoostBatchSampler(minibatch_size=2, beta=1.0, rng=random.Random(42))
         loader = MockDataLoader([0, 1, 2])
         state = MockGEPAState()
 
         # First sample - all weights are 1.0
         sampler.next_minibatch_ids(loader, state)
-        avg = sampler.get_last_sampled_avg_weight()
-        assert avg == pytest.approx(1.0, rel=0.01)
+        weights = sampler.get_batch_weights()
+        assert weights is not None
+        assert len(weights) == 2
+        for w in weights:
+            assert w == pytest.approx(1.0, rel=0.01)
 
         # Update weights
         state.full_program_trace.append({"subsample_ids": [0, 1, 2], "subsample_scores": [0.0, 0.5, 1.0]})
         sampler.next_minibatch_ids(loader, state)
 
-        # Average should reflect the sampled items' weights
-        avg = sampler.get_last_sampled_avg_weight()
-        assert avg > 0  # Should be positive
+        # Weights should reflect the sampled items' weights
+        weights = sampler.get_batch_weights()
+        assert weights is not None
+        assert all(w > 0 for w in weights)  # Should be positive
 
-    def test_get_last_sampled_avg_weight_empty(self):
-        """Test get_last_sampled_avg_weight returns 1.0 when no samples yet."""
+    def test_get_batch_weights_empty(self):
+        """Test get_batch_weights returns None when no samples yet."""
         sampler = AdaBoostBatchSampler(minibatch_size=2, rng=random.Random(42))
-        assert sampler.get_last_sampled_avg_weight() == 1.0
+        assert sampler.get_batch_weights() is None
+
+    def test_get_all_sample_weights(self):
+        """Test get_all_sample_weights returns per-sample weights."""
+        sampler = AdaBoostBatchSampler(minibatch_size=3, rng=random.Random(42))
+        loader = MockDataLoader([0, 1, 2])
+        state = MockGEPAState()
+
+        # Before any sampling
+        assert sampler.get_all_sample_weights() is None
+
+        # After sampling
+        sampler.next_minibatch_ids(loader, state)
+        all_weights = sampler.get_all_sample_weights()
+
+        assert all_weights is not None
+        assert 0 in all_weights
+        assert 1 in all_weights
+        assert 2 in all_weights
+        assert all_weights[0] == pytest.approx(1.0, rel=0.01)
+
+    def test_metric_logging_protocol_conformance(self):
+        """Test that AdaBoostBatchSampler conforms to MetricLoggingBatchSampler protocol."""
+        sampler = AdaBoostBatchSampler(minibatch_size=2)
+        assert isinstance(sampler, MetricLoggingBatchSampler)
 
     def test_minibatch_size_larger_than_dataset(self):
         """Test that minibatch_size larger than dataset returns all samples."""
@@ -450,24 +479,51 @@ class TestPMaxBatchSampler:
         with pytest.raises(ValueError, match="Cannot sample from empty loader"):
             sampler.next_minibatch_ids(loader, state)
 
-    def test_get_last_sampled_avg_weight(self):
-        """Test get_last_sampled_avg_weight returns correct average."""
+    def test_get_batch_weights(self):
+        """Test get_batch_weights returns correct weights."""
         sampler = PMaxBatchSampler(minibatch_size=2, beta=1.0, rng=random.Random(42))
         loader = MockDataLoader([0, 1, 2])
         state = MockGEPAState()
 
         # First sample - all weights are 1.0
         sampler.next_minibatch_ids(loader, state)
-        avg = sampler.get_last_sampled_avg_weight()
-        assert avg == pytest.approx(1.0, rel=0.01)
+        weights = sampler.get_batch_weights()
+        assert weights is not None
+        assert len(weights) == 2
+        for w in weights:
+            assert w == pytest.approx(1.0, rel=0.01)
 
         # Update weights with zero scores (all unsolved, get AdaBoost updates)
         state.full_program_trace.append({"subsample_ids": [0, 1, 2], "subsample_scores": [0.0, 0.0, 0.0]})
         sampler.next_minibatch_ids(loader, state)
 
-        # Average should reflect the sampled items' weights
-        avg = sampler.get_last_sampled_avg_weight()
-        assert avg > 0  # Should be positive
+        # Weights should reflect the sampled items' weights
+        weights = sampler.get_batch_weights()
+        assert weights is not None
+        assert all(w > 0 for w in weights)  # Should be positive
+
+    def test_get_all_sample_weights(self):
+        """Test get_all_sample_weights returns per-sample weights."""
+        sampler = PMaxBatchSampler(minibatch_size=3, rng=random.Random(42))
+        loader = MockDataLoader([0, 1, 2])
+        state = MockGEPAState()
+
+        # Before any sampling
+        assert sampler.get_all_sample_weights() is None
+
+        # After sampling
+        sampler.next_minibatch_ids(loader, state)
+        all_weights = sampler.get_all_sample_weights()
+
+        assert all_weights is not None
+        assert 0 in all_weights
+        assert 1 in all_weights
+        assert 2 in all_weights
+
+    def test_metric_logging_protocol_conformance(self):
+        """Test that PMaxBatchSampler conforms to MetricLoggingBatchSampler protocol."""
+        sampler = PMaxBatchSampler(minibatch_size=2)
+        assert isinstance(sampler, MetricLoggingBatchSampler)
 
     def test_best_score_tracking(self):
         """Test that sampler correctly tracks best scores internally."""

@@ -28,7 +28,7 @@ from gepa.proposer.reflective_mutation.base import (
     LanguageModel,
     ReflectionComponentSelector,
 )
-from gepa.strategies.batch_sampler import BatchSampler
+from gepa.strategies.batch_sampler import BatchSampler, MetricLoggingBatchSampler
 from gepa.strategies.instruction_proposal import InstructionProposalSignature
 
 
@@ -134,14 +134,23 @@ class ReflectiveMutationProposer(ProposeNewCandidate[DataId]):
         state.full_program_trace[-1]["subsample_ids"] = subsample_ids
         minibatch = self.trainset.fetch(subsample_ids)
 
-        # Log AdaBoost sampler average weight if applicable
-        if hasattr(self.batch_sampler, "get_last_sampled_avg_weight"):
-            avg_weight = self.batch_sampler.get_last_sampled_avg_weight()
-            self.experiment_tracker.log_metrics({"train/batch_weight_avg": avg_weight}, iteration=state.i)
-        if hasattr(self.batch_sampler, "get_train_sample_weight_stats"):
-            weight_stats = self.batch_sampler.get_train_sample_weight_stats()
-            if weight_stats:
-                self.experiment_tracker.log_metrics(weight_stats, iteration=state.i)
+        # Log metrics from weighted samplers if applicable
+        if isinstance(self.batch_sampler, MetricLoggingBatchSampler):
+            if batch_weights := self.batch_sampler.get_batch_weights():
+                batch_metrics = {"train/batch_weight_avg": sum(batch_weights) / len(batch_weights)}
+                self.logger.debug(f"Iteration {i}: Batch metrics: {batch_metrics}", header="metric")
+                self.experiment_tracker.log_metrics(batch_metrics, iteration=state.i)
+            if all_weights := self.batch_sampler.get_all_sample_weights():
+                weights = list(all_weights.values())
+                train_stats = {
+                    "train/weight_avg": sum(weights) / len(weights),
+                    "train/weight_max": max(weights),
+                    "train/weight_min": min(weights),
+                }
+                self.logger.debug(f"Iteration {i}: Train sample stats: {train_stats}", header="metric")
+                self.experiment_tracker.log_metrics(train_stats, iteration=state.i)
+                self.logger.debug(f"Iteration {i}: Logging {len(all_weights)} per-sample weights", header="metric")
+                self.experiment_tracker.log_sample_weights_table(all_weights, iteration=state.i)
 
         # Notify minibatch sampled
         notify_callbacks(

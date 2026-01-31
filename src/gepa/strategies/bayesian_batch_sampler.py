@@ -197,25 +197,19 @@ class BayesianBatchSampler(BatchSampler[DataId, DataInst]):
         """Return (successes, failures) counts for each sample within the window."""
         return {data_id: self._get_windowed_counts(data_id) for data_id in self._outcome_history}
 
-    def get_last_sampled_avg_weight(self) -> float:
-        """Return the average frontier score of the most recently sampled batch."""
+    def get_batch_weights(self) -> list[float] | None:
+        """Return weights of samples in the most recent batch."""
         if not self._last_sampled_ids:
-            return 1.0
-        scores = [self._scores.get(data_id, 1.0) for data_id in self._last_sampled_ids]
-        return sum(scores) / len(scores)
+            return None
+        return [self._scores.get(data_id, 1.0) for data_id in self._last_sampled_ids]
 
-    def get_train_sample_weight_stats(self) -> dict[str, float] | None:
-        """Return frontier score statistics for all training samples.
+    def get_all_sample_weights(self) -> dict[DataId, float] | None:
+        """Return per-sample frontier scores as {sample_id: score}.
 
         Returns:
-            Dict with train/frontier_score_avg, train/frontier_score_max, train/frontier_score_min,
+            Dict with data_id: score for each sample,
             or None if no scores computed yet.
         """
         if not self._scores:
             return None
-        all_scores = list(self._scores.values())
-        return {
-            "train/frontier_score_avg": sum(all_scores) / len(all_scores),
-            "train/frontier_score_max": max(all_scores),
-            "train/frontier_score_min": min(all_scores),
-        }
+        return dict(self._scores)

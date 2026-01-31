@@ -5,6 +5,7 @@ from collections import Counter
 
 import pytest
 
+from gepa.strategies.batch_sampler import MetricLoggingBatchSampler
 from gepa.strategies.bayesian_batch_sampler import BayesianBatchSampler, bayesian_frontier_score
 
 
@@ -202,40 +203,49 @@ class TestBayesianBatchSampler:
         assert 3 not in counts
         assert 4 not in counts
 
-    def test_get_last_sampled_avg_weight(self):
-        """Test get_last_sampled_avg_weight returns correct average."""
+    def test_get_batch_weights(self):
+        """Test get_batch_weights returns correct weights."""
         sampler = BayesianBatchSampler(minibatch_size=2)
         loader = MockDataLoader([0, 1, 2])
         state = MockGEPAState()
 
         # First sample - all scores are 1.0 (cold start)
         sampler.next_minibatch_ids(loader, state)
-        avg = sampler.get_last_sampled_avg_weight()
-        assert avg == pytest.approx(1.0)
+        weights = sampler.get_batch_weights()
+        assert weights is not None
+        assert len(weights) == 2
+        for w in weights:
+            assert w == pytest.approx(1.0)
 
-    def test_get_last_sampled_avg_weight_empty(self):
-        """Test get_last_sampled_avg_weight returns 1.0 when no samples yet."""
+    def test_get_batch_weights_empty(self):
+        """Test get_batch_weights returns None when no samples yet."""
         sampler = BayesianBatchSampler(minibatch_size=2)
-        assert sampler.get_last_sampled_avg_weight() == 1.0
+        assert sampler.get_batch_weights() is None
 
-    def test_get_train_sample_weight_stats(self):
-        """Test get_train_sample_weight_stats returns correct stats."""
+    def test_get_all_sample_weights(self):
+        """Test get_all_sample_weights returns per-sample weights."""
         sampler = BayesianBatchSampler(minibatch_size=3)
         loader = MockDataLoader([0, 1, 2])
         state = MockGEPAState()
 
         # Before any sampling
-        assert sampler.get_train_sample_weight_stats() is None
+        assert sampler.get_all_sample_weights() is None
 
         # After sampling
         sampler.next_minibatch_ids(loader, state)
-        stats = sampler.get_train_sample_weight_stats()
+        all_weights = sampler.get_all_sample_weights()
 
-        assert stats is not None
-        assert "train/frontier_score_avg" in stats
-        assert "train/frontier_score_max" in stats
-        assert "train/frontier_score_min" in stats
-        assert stats["train/frontier_score_avg"] == 1.0  # All cold start
+        assert all_weights is not None
+        assert 0 in all_weights
+        assert 1 in all_weights
+        assert 2 in all_weights
+        # All cold start, should be 1.0
+        assert all_weights[0] == pytest.approx(1.0)
+
+    def test_metric_logging_protocol_conformance(self):
+        """Test that BayesianBatchSampler conforms to MetricLoggingBatchSampler protocol."""
+        sampler = BayesianBatchSampler(minibatch_size=2)
+        assert isinstance(sampler, MetricLoggingBatchSampler)
 
     def test_minibatch_size_larger_than_dataset(self):
         """Test that minibatch_size larger than dataset returns all samples."""

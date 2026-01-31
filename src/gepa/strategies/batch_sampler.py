@@ -3,7 +3,7 @@
 
 import random
 from collections import Counter
-from typing import Protocol
+from typing import Protocol, runtime_checkable
 
 from gepa.core.adapter import DataInst
 from gepa.core.data_loader import DataId, DataLoader
@@ -12,6 +12,19 @@ from gepa.core.state import GEPAState
 
 class BatchSampler(Protocol[DataId, DataInst]):
     def next_minibatch_ids(self, loader: DataLoader[DataId, DataInst], state: GEPAState) -> list[DataId]: ...
+
+
+@runtime_checkable
+class MetricLoggingBatchSampler(BatchSampler[DataId, DataInst], Protocol):
+    """Protocol for batch samplers that provide raw weight data for logging."""
+
+    def get_batch_weights(self) -> list[float] | None:
+        """Weights of samples in the most recent batch."""
+        ...
+
+    def get_all_sample_weights(self) -> dict[DataId, float] | None:
+        """Per-sample weights as {sample_id: weight}."""
+        ...
 
 
 class EpochShuffledBatchSampler(BatchSampler[DataId, DataInst]):

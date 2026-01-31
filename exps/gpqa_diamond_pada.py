@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
-"""GPQA Diamond experiment with GEPA."""
+"""GPQA Diamond experiment with GEPA using PAdaBoostBatchSampler."""
 
 import gepa
 from gepa import LiteLLMCacheLogger, VerboseCallback, get_logger
 from gepa.examples.gpqa import init_dataset
+from gepa.strategies import PAdaBoostBatchSampler
 
 logger = get_logger()
 
@@ -30,7 +31,7 @@ def main() -> None:
         task_lm="openrouter/qwen/qwen3-vl-235b-a22b-instruct",
         reflection_lm="openrouter/deepseek/deepseek-v3.2",
         max_metric_calls=2000,
-        reflection_minibatch_size=5,
+        batch_sampler=PAdaBoostBatchSampler(minibatch_size=5),
         display_progress_bar=True,
         seed=42,
         use_weave=True,

@@ -133,8 +133,7 @@ GEPA already implements related concepts:
 | GEPA Component | Coevolution Concept |
 |----------------|---------------------|
 | `pareto_front_valset` | Per-sample Pareto tracking |
-| `PAdaBoostBatchSampler` | Solvable/unsolvable distinction |
-| `PMaxBatchSampler` | Focus on hard samples |
+| `PMaxBatchSampler` | Focus on hard/unattempted samples |
 | `evaluation_cache` | Avoid redundant evaluations |
 
 ### Gap: Shared Subset Across Candidates

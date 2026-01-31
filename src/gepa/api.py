@@ -80,7 +80,7 @@ def optimize(
     cache_evaluation: bool = False,
     # LiteLLM cache configuration
     auto_configure_cache: bool = True,
-    cache_type: Literal["disk", "r2", "redis", "s3"] = "disk",
+    cache_type: Literal["disk", "r2", "redis", "s3"] = "r2",
     # Reproducibility
     seed: int = 0,
     raise_on_exception: bool = True,

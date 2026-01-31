@@ -8,25 +8,25 @@ from typing import Any, Literal
 
 
 def configure_cache(
-    backend: Literal["disk", "r2", "redis", "s3"] = "disk",
+    backend: Literal["disk", "r2", "redis", "s3"] = "r2",
     **kwargs: Any,
 ) -> None:
     """Configure LiteLLM cache.
 
     Args:
         backend: Cache backend type
-            - "disk": Local disk cache (default)
-            - "r2": Cloudflare R2 (reads from R2_* env vars)
+            - "r2": Cloudflare R2 (default, reads from R2_* env vars)
+            - "disk": Local disk cache
             - "redis": Redis cache
             - "s3": AWS S3 or compatible
         **kwargs: Additional arguments passed to litellm.Cache()
 
     Examples:
-        # Disk cache (default)
-        configure_cache("disk")
-
-        # Cloudflare R2 (set R2_BUCKET_NAME, R2_ENDPOINT_URL, R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY)
+        # Cloudflare R2 (default, set R2_BUCKET_NAME, R2_ENDPOINT_URL, R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY)
         configure_cache("r2")
+
+        # Disk cache
+        configure_cache("disk")
 
         # Custom S3
         configure_cache("s3", s3_bucket_name="my-bucket", s3_region_name="us-west-2")

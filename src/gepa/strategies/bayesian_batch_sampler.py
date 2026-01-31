@@ -81,6 +81,7 @@ class BayesianBatchSampler(BatchSampler[DataId, DataInst]):
 
         self._update_counts_from_state(state)
         self._compute_scores(all_ids)
+        self._normalize_scores(all_ids)
         self._update_residual_sampler(all_ids)
         return self._sample_from_residual(all_ids)
 
@@ -139,6 +140,20 @@ class BayesianBatchSampler(BatchSampler[DataId, DataInst]):
         for data_id in all_ids:
             s, f = self._get_windowed_counts(data_id)
             self._scores[data_id] = bayesian_frontier_score(s, f)
+
+    def _normalize_scores(self, all_ids: Sequence[DataId]) -> None:
+        """Normalize scores so they sum to the number of samples.
+
+        This ensures average score = 1.0 for consistency with other samplers
+        and easier visualization. Does not affect sampling behavior since
+        ResidualWeightedSampler uses relative weights.
+        """
+        total = sum(self._scores[data_id] for data_id in all_ids)
+        if total == 0:
+            return
+        scale = len(all_ids) / total
+        for data_id in all_ids:
+            self._scores[data_id] *= scale
 
     def _update_residual_sampler(self, all_ids: Sequence[DataId]) -> None:
         """Update residual sampler with current scores."""

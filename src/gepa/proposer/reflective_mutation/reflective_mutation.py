@@ -137,7 +137,7 @@ class ReflectiveMutationProposer(ProposeNewCandidate[DataId]):
         # Log AdaBoost sampler average weight if applicable
         if hasattr(self.batch_sampler, "get_last_sampled_avg_weight"):
             avg_weight = self.batch_sampler.get_last_sampled_avg_weight()
-            self.experiment_tracker.log_metrics({"mini_batch/sampled_weight_avg": avg_weight}, iteration=state.i)
+            self.experiment_tracker.log_metrics({"train/batch_weight_avg": avg_weight}, iteration=state.i)
         if hasattr(self.batch_sampler, "get_train_sample_weight_stats"):
             weight_stats = self.batch_sampler.get_train_sample_weight_stats()
             if weight_stats:
@@ -227,7 +227,7 @@ class ReflectiveMutationProposer(ProposeNewCandidate[DataId]):
             )
             return None
 
-        self.experiment_tracker.log_metrics({"mini_batch/score_before": sum(eval_curr.scores)}, iteration=state.i)
+        self.experiment_tracker.log_metrics({"train/batch_score_before": sum(eval_curr.scores)}, iteration=state.i)
 
         # 2) Decide which predictors to update
         predictor_names_to_update = self.module_selector(
@@ -343,7 +343,7 @@ class ReflectiveMutationProposer(ProposeNewCandidate[DataId]):
         state.full_program_trace[-1]["new_subsample_scores"] = new_scores
 
         new_sum = sum(new_scores)
-        self.experiment_tracker.log_metrics({"mini_batch/score_after": new_sum}, iteration=state.i)
+        self.experiment_tracker.log_metrics({"train/batch_score_after": new_sum}, iteration=state.i)
 
         # Add feedback with subsample scores
         add_call_feedback(

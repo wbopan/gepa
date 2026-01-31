@@ -45,7 +45,7 @@ class ExperimentTracker:
             wandb.define_metric("gepa_iteration")
             wandb.define_metric("*", step_metric="gepa_iteration")
 
-            # Initialize weave with tracing enabled
+            # Note: As of weave 0.51+, explicit weave.init() is no longer required with wandb.
             weave.init(project_name=self.weave_project_name)
         else:
             # Initialize weave with tracing disabled

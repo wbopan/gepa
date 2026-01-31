@@ -63,7 +63,7 @@ class ResidualWeightedSampler:
             raise ValueError(f"Weights length must be {self.n}, got {len(weights)}")
         self._weights = list(weights)
 
-    def sample(self, k: int = 1) -> list[int]:
+    def sample(self, k: int = 1, unique: bool = True) -> list[int]:
         """Sample k element indices according to weights.
 
         Elements with higher weights appear more frequently. Unlike probability-based
@@ -71,39 +71,65 @@ class ResidualWeightedSampler:
 
         Args:
             k: Number of samples to return.
+            unique: If True (default), each element appears at most once per batch.
+                High-weight elements that would be sampled multiple times have their
+                excess deferred to subsequent sample() calls via the accumulator.
+                If False, elements may appear multiple times in a single batch.
 
         Returns:
-            List of k element indices (0 to n-1). May contain duplicates if
-            an element has weight > 1.
-        """
-        result: list[int] = []
+            List of k element indices (0 to n-1). May contain duplicates only if
+            unique=False and an element has weight > 1.
 
-        # First consume any buffered elements from previous sampling
-        while k > 0 and self._buffer:
-            result.append(self._buffer.popleft())
-            k -= 1
+        Raises:
+            ValueError: If unique=True and k > number of non-zero weight elements.
+        """
+        if unique:
+            non_zero_count = sum(1 for w in self._weights if w > 0)
+            if k > non_zero_count:
+                raise ValueError(
+                    f"Cannot sample {k} unique elements: only {non_zero_count} elements have non-zero weight"
+                )
+
+        result: list[int] = []
+        seen_in_batch: set[int] = set()
+
+        # First consume any buffered elements from previous sampling (only when unique=False)
+        if not unique:
+            while k > 0 and self._buffer:
+                result.append(self._buffer.popleft())
+                k -= 1
 
         if k == 0:
             return result
 
         # Generate more elements by traversing the list
-        while k > 0:
+        while len(result) < k:
             idx = self._cursor
             w = self._weights[idx]
 
-            # Core algorithm: accumulate weight and emit floor(accumulator) times
+            # Core algorithm: accumulate weight
             self._accumulators[idx] += w
-            count = int(self._accumulators[idx])
-            self._accumulators[idx] -= count
 
-            # Distribute produced elements
-            for _ in range(count):
-                if k > 0:
-                    result.append(idx)
-                    k -= 1
+            # Check if this element should be emitted
+            if self._accumulators[idx] >= 1.0:
+                if unique:
+                    # Unique mode: emit at most once per batch
+                    if idx not in seen_in_batch:
+                        result.append(idx)
+                        seen_in_batch.add(idx)
+                        self._accumulators[idx] -= 1.0
+                    # If already seen, keep accumulator (defer to next batch)
                 else:
-                    # Buffer excess for next sample() call
-                    self._buffer.append(idx)
+                    # Non-unique mode: emit floor(accumulator) times
+                    count = int(self._accumulators[idx])
+                    self._accumulators[idx] -= count
+
+                    for _ in range(count):
+                        if len(result) < k:
+                            result.append(idx)
+                        else:
+                            # Buffer excess for next sample() call
+                            self._buffer.append(idx)
 
             # Move cursor (round-robin)
             self._cursor = (self._cursor + 1) % self.n

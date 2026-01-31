@@ -543,3 +543,119 @@ def notify_callbacks(
                 method(event)
             except Exception as e:
                 logger.warning(f"Callback {callback} failed on {method_name}: {e}")
+
+
+# =============================================================================
+# Built-in Callbacks
+# =============================================================================
+
+
+class VerboseCallback:
+    """Prints detailed progress during optimization using RichLogger.
+
+    This callback provides human-readable progress output during optimization,
+    including iteration status, candidate selection, evaluation results, and
+    budget tracking.
+
+    Example:
+        result = optimize(
+            seed_candidate={"instructions": "..."},
+            trainset=data,
+            callbacks=[VerboseCallback()],
+            ...
+        )
+    """
+
+    def __init__(self) -> None:
+        from gepa.logging.logger import get_logger
+
+        self._logger = get_logger()
+        self._indent_logger = self._logger.indent()
+
+    def on_optimization_start(self, event: OptimizationStartEvent) -> None:
+        self._logger.log(
+            f"Optimization started: {event['trainset_size']} train, {event['valset_size']} val examples",
+            header="start",
+        )
+
+    def on_iteration_start(self, event: IterationStartEvent) -> None:
+        self._logger.log(f"Starting iteration {event['iteration']}...", header="iter")
+
+    def on_candidate_selected(self, event: CandidateSelectedEvent) -> None:
+        self._indent_logger.log(
+            f"Candidate {event['candidate_idx']} selected (score: {event['score']:.2%})", header="select"
+        )
+
+    def on_minibatch_sampled(self, event: MinibatchSampledEvent) -> None:
+        self._indent_logger.log(f"Minibatch of {len(event['minibatch_ids'])} examples sampled", header="sample")
+
+    def on_evaluation_start(self, event: EvaluationStartEvent) -> None:
+        self._indent_logger.log(f"Evaluating batch of {event['batch_size']} examples...", header="eval")
+
+    def on_evaluation_end(self, event: EvaluationEndEvent) -> None:
+        avg = sum(event["scores"]) / len(event["scores"]) if event["scores"] else 0
+        self._indent_logger.log(f"Done. Avg score: {avg:.2%}", header="eval")
+
+    def on_candidate_accepted(self, event: CandidateAcceptedEvent) -> None:
+        self._indent_logger.log(
+            f"New candidate {event['new_candidate_idx']} accepted (score: {event['new_score']:.2f})", header="accept"
+        )
+
+    def on_candidate_rejected(self, event: CandidateRejectedEvent) -> None:
+        self._indent_logger.log(f"Candidate rejected: {event['reason']}", header="reject")
+
+    def on_budget_updated(self, event: BudgetUpdatedEvent) -> None:
+        remaining = event["metric_calls_remaining"]
+        if remaining:
+            self._indent_logger.log(
+                f"{event['metric_calls_used']} / {event['metric_calls_used'] + remaining} calls used", header="budget"
+            )
+
+
+class LiteLLMCacheLogger:
+    """Logs LiteLLM request timing and cache hits/misses.
+
+    This callback integrates with LiteLLM's callback system to provide
+    detailed logging of API requests, including timing and cache status.
+
+    Note: This callback must be registered with LiteLLM separately from
+    GEPA callbacks. Example:
+
+        import litellm
+        litellm.callbacks = [LiteLLMCacheLogger()]
+
+    Or use the convenience method:
+
+        LiteLLMCacheLogger.register()
+    """
+
+    def __init__(self) -> None:
+        from gepa.logging.logger import get_logger
+
+        self._logger = get_logger()
+
+    @classmethod
+    def register(cls) -> LiteLLMCacheLogger:
+        """Create and register with litellm.callbacks."""
+        import litellm
+
+        instance = cls()
+        if litellm.callbacks is None:
+            litellm.callbacks = [instance]
+        else:
+            litellm.callbacks.append(instance)
+        return instance
+
+    def log_pre_api_call(self, model: str, _messages: Any, _kwargs: Any) -> None:
+        """Called before each API request is sent."""
+        from datetime import datetime
+
+        self._logger.debug(f"[{datetime.now().strftime('%H:%M:%S.%f')[:-3]}] {model}", header="request")
+
+    def log_success_event(self, kwargs: Any, _response_obj: Any, start_time: Any, end_time: Any) -> None:
+        """Called when a request completes successfully."""
+        cache_hit = kwargs.get("cache_hit", False)
+        model = kwargs.get("model", "unknown")
+        duration = (end_time - start_time).total_seconds()
+        header = "cache hit" if cache_hit else "cache miss"
+        self._logger.debug(f"[{end_time.strftime('%H:%M:%S.%f')[:-3]}] {model} ({duration:.2f}s)", header=header)

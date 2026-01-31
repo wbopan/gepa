@@ -78,6 +78,9 @@ def optimize(
     use_cloudpickle: bool = False,
     # Evaluation caching
     cache_evaluation: bool = False,
+    # LiteLLM cache configuration
+    auto_configure_cache: bool = True,
+    cache_type: Literal["disk", "r2", "redis", "s3"] = "disk",
     # Reproducibility
     seed: int = 0,
     raise_on_exception: bool = True,
@@ -161,6 +164,10 @@ def optimize(
     # Evaluation caching
     - cache_evaluation: Whether to cache the (score, output, objective_scores) of (candidate, example) pairs. If True and a cache entry exists, GEPA will skip the fitness evaluation and use the cached results. This helps avoid redundant evaluations and saves metric calls. Defaults to False.
 
+    # LiteLLM cache configuration
+    - auto_configure_cache: Whether to automatically configure LiteLLM caching if not already configured. Defaults to True. Set to False if you want to configure caching manually or disable it entirely.
+    - cache_type: The type of cache to use when auto_configure_cache is True. Supported values: 'disk', 'r2', 'redis', 's3'. Defaults to 'disk'.
+
     # Reproducibility
     - seed: The seed to use for the random number generator.
     - val_evaluation_policy: Strategy controlling which validation ids to score each iteration and which candidate is currently best. Supported strings: "full_eval" (evaluate every id each time) Passing None defaults to "full_eval".
@@ -169,6 +176,15 @@ def optimize(
     # Validate seed_candidate is not None or empty
     if seed_candidate is None or not seed_candidate:
         raise ValueError("seed_candidate must contain at least one component text.")
+
+    # Auto-configure LiteLLM cache if requested and not already configured
+    if auto_configure_cache:
+        import litellm
+
+        if litellm.cache is None:
+            from gepa.cache import configure_cache
+
+            configure_cache(cache_type)
 
     active_adapter: GEPAAdapter[DataInst, Trajectory, RolloutOutput] | None = None
     if adapter is None:

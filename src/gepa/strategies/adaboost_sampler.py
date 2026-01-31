@@ -11,6 +11,7 @@ from gepa.core.data_loader import DataId, DataLoader
 from gepa.core.state import GEPAState
 from gepa.logging import get_logger
 from gepa.strategies.batch_sampler import BatchSampler
+from gepa.strategies.residual_weighted_sampler import ResidualWeightedSampler
 
 logger = get_logger()
 
@@ -22,18 +23,24 @@ class AdaBoostBatchSampler(BatchSampler[DataId, DataInst]):
     Each sample has a weight that is updated based on evaluation scores:
     - Samples with low scores (errors) have their weights increased
     - Samples with high scores have their weights decreased
-    - Weights are used for probabilistic sampling without replacement
+
+    Uses ResidualWeightedSampler for deterministic weighted sampling that
+    guarantees all samples are eventually visited. Weight determines expected
+    frequency (not just selection probability), so high-weight samples may
+    appear multiple times in a single batch.
     """
 
     minibatch_size: int
     beta: float = 1.0  # Weight update sensitivity
     min_weight: float = 0.1  # Prevent weights from going to zero
     max_weight: float = 10.0  # Prevent weight explosion
-    rng: random.Random = field(default_factory=lambda: random.Random(0))
+    rng: random.Random = field(default_factory=lambda: random.Random(0))  # Unused, kept for compatibility
 
     _weights: dict[DataId, float] = field(default_factory=dict)
     _last_processed_trace_idx: int = field(default=-1)
     _last_sampled_ids: list[DataId] = field(default_factory=list)
+    _residual_sampler: ResidualWeightedSampler | None = field(default=None)
+    _cached_all_ids: list[DataId] = field(default_factory=list)
 
     def next_minibatch_ids(self, loader: DataLoader[DataId, DataInst], state: GEPAState) -> list[DataId]:
         all_ids = list(loader.all_ids())
@@ -43,7 +50,7 @@ class AdaBoostBatchSampler(BatchSampler[DataId, DataInst]):
         self._initialize_weights(all_ids)
         self._update_weights_from_state(state)
         self._normalize_weights(all_ids)
-        return self._weighted_sample_without_replacement(all_ids)
+        return self._weighted_sample(all_ids)
 
     def _initialize_weights(self, all_ids: Sequence[DataId]) -> None:
         """Initialize weights for any new data IDs."""
@@ -92,19 +99,28 @@ class AdaBoostBatchSampler(BatchSampler[DataId, DataInst]):
         for data_id in all_ids:
             self._weights[data_id] *= scale
 
-    def _weighted_sample_without_replacement(self, all_ids: Sequence[DataId]) -> list[DataId]:
-        """Sample minibatch_size items without replacement using weights."""
-        n = min(self.minibatch_size, len(all_ids))
-        remaining = list(all_ids)
-        remaining_weights = [self._weights[data_id] for data_id in remaining]
-        selected: list[DataId] = []
+    def _weighted_sample(self, all_ids: Sequence[DataId]) -> list[DataId]:
+        """Sample minibatch_size items using residual weighted sampling.
 
-        for _ in range(n):
-            if sum(remaining_weights) == 0:
-                break
-            idx = self.rng.choices(range(len(remaining)), weights=remaining_weights, k=1)[0]
-            selected.append(remaining.pop(idx))
-            remaining_weights.pop(idx)
+        Uses ResidualWeightedSampler for deterministic weighted sampling that
+        guarantees eventual coverage of all samples. High-weight samples may
+        appear multiple times in a single batch.
+        """
+        n = min(self.minibatch_size, len(all_ids))
+        all_ids_list = list(all_ids)
+
+        # Initialize or update the residual sampler
+        if self._residual_sampler is None or self._cached_all_ids != all_ids_list:
+            self._residual_sampler = ResidualWeightedSampler(len(all_ids_list))
+            self._cached_all_ids = all_ids_list
+
+        # Update weights in the residual sampler
+        weights = [self._weights[data_id] for data_id in all_ids_list]
+        self._residual_sampler.update_weights(weights)
+
+        # Sample indices and convert to DataIds
+        sampled_indices = self._residual_sampler.sample(n)
+        selected = [all_ids_list[idx] for idx in sampled_indices]
 
         self._last_sampled_ids = selected
         self._log_weight_stats()
@@ -161,6 +177,9 @@ class PMaxBatchSampler(BatchSampler[DataId, DataInst]):
       - May be difficult, boost weight to get more training opportunities
     - Once-solved samples (best_score > 0): weight reset to 1.0
       - Already proven solvable, no need for extra focus
+
+    Uses ResidualWeightedSampler for deterministic weighted sampling that
+    guarantees all samples are eventually visited.
     """
 
     minibatch_size: int
@@ -168,13 +187,15 @@ class PMaxBatchSampler(BatchSampler[DataId, DataInst]):
     min_weight: float = 0.1  # Prevent weights from going to zero
     max_weight: float = 10.0  # Prevent weight explosion
     unattempted_boost: float = 1.5  # Initial weight boost for unattempted samples
-    rng: random.Random = field(default_factory=lambda: random.Random(0))
+    rng: random.Random = field(default_factory=lambda: random.Random(0))  # Unused, kept for compatibility
 
     _weights: dict[DataId, float] = field(default_factory=dict)
     _best_scores: dict[DataId, float] = field(default_factory=dict)  # Track best score per training sample
     _attempted: set[DataId] = field(default_factory=set)  # Track which samples have been attempted
     _last_processed_trace_idx: int = field(default=-1)
     _last_sampled_ids: list[DataId] = field(default_factory=list)
+    _residual_sampler: ResidualWeightedSampler | None = field(default=None)
+    _cached_all_ids: list[DataId] = field(default_factory=list)
 
     def next_minibatch_ids(self, loader: DataLoader[DataId, DataInst], state: GEPAState) -> list[DataId]:
         all_ids = list(loader.all_ids())
@@ -184,7 +205,7 @@ class PMaxBatchSampler(BatchSampler[DataId, DataInst]):
         self._initialize_weights(all_ids)
         self._update_weights_from_state(state)
         self._normalize_weights(all_ids)
-        return self._weighted_sample_without_replacement(all_ids)
+        return self._weighted_sample(all_ids)
 
     def _initialize_weights(self, all_ids: Sequence[DataId]) -> None:
         """Initialize weights for any new data IDs with unattempted_boost."""
@@ -277,19 +298,28 @@ class PMaxBatchSampler(BatchSampler[DataId, DataInst]):
         for data_id in all_ids:
             self._weights[data_id] *= scale
 
-    def _weighted_sample_without_replacement(self, all_ids: Sequence[DataId]) -> list[DataId]:
-        """Sample minibatch_size items without replacement using weights."""
-        n = min(self.minibatch_size, len(all_ids))
-        remaining = list(all_ids)
-        remaining_weights = [self._weights[data_id] for data_id in remaining]
-        selected: list[DataId] = []
+    def _weighted_sample(self, all_ids: Sequence[DataId]) -> list[DataId]:
+        """Sample minibatch_size items using residual weighted sampling.
 
-        for _ in range(n):
-            if sum(remaining_weights) == 0:
-                break
-            idx = self.rng.choices(range(len(remaining)), weights=remaining_weights, k=1)[0]
-            selected.append(remaining.pop(idx))
-            remaining_weights.pop(idx)
+        Uses ResidualWeightedSampler for deterministic weighted sampling that
+        guarantees eventual coverage of all samples. High-weight samples may
+        appear multiple times in a single batch.
+        """
+        n = min(self.minibatch_size, len(all_ids))
+        all_ids_list = list(all_ids)
+
+        # Initialize or update the residual sampler
+        if self._residual_sampler is None or self._cached_all_ids != all_ids_list:
+            self._residual_sampler = ResidualWeightedSampler(len(all_ids_list))
+            self._cached_all_ids = all_ids_list
+
+        # Update weights in the residual sampler
+        weights = [self._weights[data_id] for data_id in all_ids_list]
+        self._residual_sampler.update_weights(weights)
+
+        # Sample indices and convert to DataIds
+        sampled_indices = self._residual_sampler.sample(n)
+        selected = [all_ids_list[idx] for idx in sampled_indices]
 
         self._last_sampled_ids = selected
         self._log_weight_stats()

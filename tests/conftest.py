@@ -6,6 +6,16 @@ from pathlib import Path
 import pytest
 
 
+@pytest.fixture(scope="session", autouse=True)
+def configure_test_cache(tmp_path_factory):
+    """Configure disk-based LiteLLM cache for tests to avoid Redis connection issues."""
+    from gepa.cache import configure_cache
+
+    cache_dir = tmp_path_factory.mktemp("litellm_cache")
+    configure_cache("disk", disk_cache_dir=str(cache_dir))
+    yield
+
+
 def create_mocked_lms_context(cache_dir: Path):
     """
     Generator for mocked LLM functions that handle record/replay logic.

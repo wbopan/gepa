@@ -533,3 +533,90 @@ class TestPMaxBatchSampler:
         assert 0 in sampler._attempted
         assert 1 in sampler._attempted
         assert 2 not in sampler._attempted
+
+
+class TestResidualWeightedSamplerIntegration:
+    """Tests for ResidualWeightedSampler integration in AdaBoost/PMax samplers."""
+
+    def test_adaboost_high_weight_sample_can_appear_multiple_times(self):
+        """Test that high-weight samples can appear multiple times in a batch."""
+        sampler = AdaBoostBatchSampler(minibatch_size=5, beta=5.0, rng=random.Random(42))
+        loader = MockDataLoader([0, 1, 2])
+        state = MockGEPAState()
+
+        # First sample to initialize weights
+        sampler.next_minibatch_ids(loader, state)
+
+        # Make sample 0 have very low score (high error -> high weight)
+        # and samples 1, 2 have high scores (low weight)
+        for _ in range(5):
+            state.full_program_trace.append({"subsample_ids": [0, 1, 2], "subsample_scores": [0.0, 1.0, 1.0]})
+
+        # Sample - with high weight, sample 0 should dominate
+        result = sampler.next_minibatch_ids(loader, state)
+
+        # Sample 0 should appear multiple times due to high weight
+        count_0 = result.count(0)
+        assert count_0 >= 2, f"High-weight sample should appear multiple times, got {count_0}"
+
+    def test_adaboost_low_weight_sample_eventually_sampled(self):
+        """Test that low-weight samples are eventually sampled (guaranteed coverage)."""
+        sampler = AdaBoostBatchSampler(minibatch_size=5, beta=1.0, rng=random.Random(42))
+        loader = MockDataLoader([0, 1, 2])
+        state = MockGEPAState()
+
+        sampler.next_minibatch_ids(loader, state)
+
+        # Make sample 2 have high score (lower weight, but not extreme)
+        state.full_program_trace.append({"subsample_ids": [0, 1, 2], "subsample_scores": [0.2, 0.2, 0.8]})
+
+        # Sample multiple batches and collect all samples
+        # With residual sampling, even low-weight samples are guaranteed to appear
+        all_samples = []
+        for _ in range(20):
+            result = sampler.next_minibatch_ids(loader, state)
+            all_samples.extend(result)
+
+        # Even with lower weight, sample 2 should appear (guaranteed by residual sampling)
+        assert 2 in all_samples, "Low-weight sample should eventually be sampled"
+
+    def test_pmax_high_weight_sample_can_appear_multiple_times(self):
+        """Test that high-weight samples can appear multiple times in PMax."""
+        sampler = PMaxBatchSampler(minibatch_size=5, beta=5.0, rng=random.Random(42))
+        loader = MockDataLoader([0, 1, 2])
+        state = MockGEPAState()
+
+        sampler.next_minibatch_ids(loader, state)
+
+        # Sample 0 stays unsolved (high weight), samples 1, 2 get solved (weight reset to 1.0)
+        for _ in range(5):
+            state.full_program_trace.append({"subsample_ids": [0, 1, 2], "subsample_scores": [0.0, 0.5, 0.5]})
+
+        result = sampler.next_minibatch_ids(loader, state)
+
+        # Sample 0 (unsolved, high weight) should appear multiple times
+        count_0 = result.count(0)
+        assert count_0 >= 2, f"High-weight unsolved sample should appear multiple times, got {count_0}"
+
+    def test_sampling_distribution_matches_weights_over_time(self):
+        """Test that sampling distribution matches weights over many iterations."""
+        sampler = AdaBoostBatchSampler(minibatch_size=10, beta=1.0, rng=random.Random(42))
+        loader = MockDataLoader([0, 1, 2, 3, 4])
+        state = MockGEPAState()
+
+        sampler.next_minibatch_ids(loader, state)
+
+        # Set up different scores to create weight variance
+        state.full_program_trace.append(
+            {"subsample_ids": [0, 1, 2, 3, 4], "subsample_scores": [0.0, 0.25, 0.5, 0.75, 1.0]}
+        )
+
+        # Sample many times
+        counts = Counter()
+        for _ in range(50):
+            result = sampler.next_minibatch_ids(loader, state)
+            counts.update(result)
+
+        # Lower-scoring samples (0, 1) should appear more frequently than higher-scoring ones (3, 4)
+        assert counts[0] > counts[4], "Low-score sample should appear more often than high-score sample"
+        assert counts[1] > counts[3], "Lower-score sample should appear more often"

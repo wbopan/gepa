@@ -2,7 +2,7 @@
 # https://github.com/gepa-ai/gepa
 
 from gepa.strategies.adaboost_sampler import AdaBoostBatchSampler, PMaxBatchSampler
-from gepa.strategies.batch_sampler import BatchSampler, EpochShuffledBatchSampler
+from gepa.strategies.batch_sampler import BatchSampler, EpochShuffledBatchSampler, MetricLoggingBatchSampler
 from gepa.strategies.bayesian_batch_sampler import BayesianBatchSampler
 from gepa.strategies.residual_weighted_sampler import ResidualWeightedSampler
 
@@ -11,6 +11,7 @@ __all__ = [
     "BatchSampler",
     "BayesianBatchSampler",
     "EpochShuffledBatchSampler",
+    "MetricLoggingBatchSampler",
     "PMaxBatchSampler",
     "ResidualWeightedSampler",
 ]

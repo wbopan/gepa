@@ -7,6 +7,7 @@ import pytest
 
 from gepa.core.state import GEPAState, ValsetEvaluation
 from gepa.strategies.candidate_selector import (
+    AvgFamilyScoreCandidateSelector,
     CurrentBestCandidateSelector,
     EpsilonGreedyCandidateSelector,
     ParetoCandidateSelector,
@@ -175,3 +176,68 @@ class TestEpsilonGreedyCandidateSelector:
 
         # With epsilon=0.01, expect ~99% to be best
         assert best_count >= 90
+
+
+class TestAvgFamilyScoreCandidateSelector:
+    def test_no_children_selects_highest_score(self, mock_state):
+        """Without children, should select candidate with highest score."""
+        # Clear lineage relationships
+        mock_state.parent_program_for_candidate = [[None], [], []]
+        selector = AvgFamilyScoreCandidateSelector()
+        # Candidate 2 has highest score (0.8), should be selected
+        assert selector.select_candidate_idx(mock_state) == 2
+
+    def test_children_affect_family_score(self, mock_state):
+        """Children scores should affect parent's family score."""
+        selector = AvgFamilyScoreCandidateSelector()
+        # mock_state: candidate 0 is parent of candidate 1, candidate 1 is parent of candidate 2
+        # Candidate 0: score 0.5, children [1] with score 0.6 -> family score = (0.5+0.6)/2 = 0.55
+        # Candidate 1: score 0.6, children [2] with score 0.8 -> family score = (0.6+0.8)/2 = 0.70
+        # Candidate 2: score 0.8, no children -> family score = 0.8
+        # Should select candidate 2
+        assert selector.select_candidate_idx(mock_state) == 2
+
+    def test_low_children_scores_lower_family_score(self):
+        """Low children scores should lower parent's family score."""
+        # Construct special scenario: parent has high score but children have low scores
+        seed_candidate = {"system_prompt": "test"}
+        base_valset_eval_output = ValsetEvaluation(
+            outputs_by_val_id={0: "out1"},
+            scores_by_val_id={0: 0.9},  # High parent score
+            objective_scores_by_val_id=None,
+        )
+        state = GEPAState(seed_candidate, base_valset_eval_output, track_best_outputs=False)
+
+        # Add a child with low score
+        state.program_candidates.append({"system_prompt": "test2"})
+        state.prog_candidate_val_subscores.append({0: 0.1})  # Very low child score
+        state.prog_candidate_objective_scores.append({})
+        state.parent_program_for_candidate.append([0])  # Child of candidate 0
+        state.named_predictor_id_to_update_next_for_program_candidate.append(0)
+        state.num_metric_calls_by_discovery.append(0)
+        state.pareto_front_valset[0] = 0.9  # Update pareto front
+        state.program_at_pareto_front_valset[0] = {0, 1}
+
+        # Add another candidate with no children but moderate score
+        state.program_candidates.append({"system_prompt": "test3"})
+        state.prog_candidate_val_subscores.append({0: 0.6})  # Moderate score
+        state.prog_candidate_objective_scores.append({})
+        state.parent_program_for_candidate.append([])  # No parent
+        state.named_predictor_id_to_update_next_for_program_candidate.append(0)
+        state.num_metric_calls_by_discovery.append(0)
+        state.program_at_pareto_front_valset[0] = {0, 1, 2}
+
+        assert state.is_consistent()
+
+        selector = AvgFamilyScoreCandidateSelector()
+        # Candidate 0: score 0.9, child [1] score 0.1 -> family score = (0.9+0.1)/2 = 0.5
+        # Candidate 1: score 0.1, no children -> family score = 0.1
+        # Candidate 2: score 0.6, no children -> family score = 0.6
+        # Should select candidate 2 with family score 0.6
+        assert selector.select_candidate_idx(state) == 2
+
+    def test_deterministic(self, mock_state):
+        """Test that selection is deterministic."""
+        selector = AvgFamilyScoreCandidateSelector()
+        results = [selector.select_candidate_idx(mock_state) for _ in range(10)]
+        assert all(r == results[0] for r in results)

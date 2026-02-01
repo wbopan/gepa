@@ -48,3 +48,34 @@ class EpsilonGreedyCandidateSelector(CandidateSelector):
             return self.rng.randint(0, len(state.program_candidates) - 1)
         else:
             return idxmax(state.program_full_scores_val_set)
+
+
+class AvgFamilyScoreCandidateSelector(CandidateSelector):
+    """Select candidate based on average family score.
+
+    Weight formula: W = (Score_parent + Σ Score_children) / (1 + |children|)
+
+    This is the optimal strategy under zero-prior constraint:
+    - When no children exist, weight = parent score (minimal reasonable prior)
+    - As children are produced, weight is updated by actual data
+    """
+
+    def __init__(self):
+        pass
+
+    def select_candidate_idx(self, state: GEPAState) -> int:
+        assert len(state.program_full_scores_val_set) == len(state.program_candidates)
+        scores = state.per_program_tracked_scores
+        n = len(state.program_candidates)
+
+        family_scores = []
+        for parent_idx in range(n):
+            parent_score = scores[parent_idx]
+            children_indices = [
+                i for i, parents in enumerate(state.parent_program_for_candidate) if parent_idx in parents
+            ]
+            children_scores = [scores[i] for i in children_indices]
+            family_score = (parent_score + sum(children_scores)) / (1 + len(children_scores))
+            family_scores.append(family_score)
+
+        return idxmax(family_scores)

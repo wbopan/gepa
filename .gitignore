@@ -213,3 +213,4 @@ wandb/
 
 # Git worktrees
 worktrees/
+artifacts/

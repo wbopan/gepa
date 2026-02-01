@@ -32,6 +32,7 @@ from gepa.strategies.candidate_selector import (
     AvgFamilyScoreCandidateSelector,
     CurrentBestCandidateSelector,
     EpsilonGreedyCandidateSelector,
+    MaxFamilyScoreCandidateSelector,
     ParetoCandidateSelector,
 )
 from gepa.strategies.component_selector import (
@@ -51,7 +52,7 @@ def optimize(
     evaluator: Evaluator | None = None,
     # Reflection-based configuration
     reflection_lm: LanguageModel | str | None = None,
-    candidate_selection_strategy: CandidateSelector | Literal["pareto", "current_best", "epsilon_greedy", "avg_family"] = "pareto",
+    candidate_selection_strategy: CandidateSelector | Literal["pareto", "current_best", "epsilon_greedy", "avg_family", "max_family"] = "pareto",
     frontier_type: FrontierType = "instance",
     skip_perfect_score: bool = True,
     batch_sampler: BatchSampler | Literal["epoch_shuffled", "adaboost"] = "epoch_shuffled",
@@ -289,6 +290,7 @@ def optimize(
             "current_best": lambda: CurrentBestCandidateSelector(),
             "epsilon_greedy": lambda: EpsilonGreedyCandidateSelector(epsilon=0.1, rng=rng),
             "avg_family": lambda: AvgFamilyScoreCandidateSelector(),
+            "max_family": lambda: MaxFamilyScoreCandidateSelector(),
         }
 
         try:
@@ -296,7 +298,7 @@ def optimize(
         except KeyError as exc:
             raise ValueError(
                 f"Unknown candidate_selector strategy: {candidate_selection_strategy}. "
-                "Supported strategies: 'pareto', 'current_best', 'epsilon_greedy', 'avg_family'"
+                "Supported strategies: 'pareto', 'current_best', 'epsilon_greedy', 'avg_family', 'max_family'"
             ) from exc
     elif isinstance(candidate_selection_strategy, CandidateSelector):
         candidate_selector = candidate_selection_strategy

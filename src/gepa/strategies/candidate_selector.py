@@ -6,6 +6,7 @@ import random
 from gepa.core.state import GEPAState
 from gepa.gepa_utils import idxmax, select_program_candidate_from_pareto_front
 from gepa.proposer.reflective_mutation.base import CandidateSelector
+from gepa.strategies.residual_weighted_sampler import ResidualWeightedSampler
 
 
 class ParetoCandidateSelector(CandidateSelector):
@@ -79,3 +80,49 @@ class AvgFamilyScoreCandidateSelector(CandidateSelector):
             family_scores.append(family_score)
 
         return idxmax(family_scores)
+
+
+class MaxFamilyScoreCandidateSelector(CandidateSelector):
+    """Select candidate using max family score with residual weighted sampling.
+
+    Family score = max(parent_score, max(children_scores))
+
+    Unlike AvgFamilyScoreCandidateSelector which punishes good candidates for
+    having high-variance children, this selector rewards candidates for their
+    best offspring performance.
+
+    Uses ResidualWeightedSampler to ensure all candidates get eventual
+    selection opportunities proportional to their family scores, avoiding
+    degenerate greedy selection.
+    """
+
+    def __init__(self):
+        self._sampler: ResidualWeightedSampler | None = None
+
+    def select_candidate_idx(self, state: GEPAState) -> int:
+        assert len(state.program_full_scores_val_set) == len(state.program_candidates)
+        scores = state.per_program_tracked_scores
+        n = len(state.program_candidates)
+
+        # Compute max family scores
+        family_scores = []
+        for parent_idx in range(n):
+            parent_score = scores[parent_idx]
+            children_indices = [
+                i for i, parents in enumerate(state.parent_program_for_candidate) if parent_idx in parents
+            ]
+            children_scores = [scores[i] for i in children_indices]
+
+            if children_scores:
+                family_score = max(parent_score, max(children_scores))
+            else:
+                family_score = parent_score
+            family_scores.append(family_score)
+
+        # Initialize or resize sampler
+        if self._sampler is None or self._sampler.n != n:
+            self._sampler = ResidualWeightedSampler(n)
+
+        # Update weights and sample
+        self._sampler.update_weights(family_scores)
+        return self._sampler.sample(k=1)[0]

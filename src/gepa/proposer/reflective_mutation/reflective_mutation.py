@@ -374,5 +374,8 @@ class ReflectiveMutationProposer(ProposeNewCandidate[DataId]):
                 "subsample_score_before": sum(eval_curr.scores),
                 "subsample_score_after": new_sum,
                 "accepted": new_sum > sum(eval_curr.scores),
+                "subsample_inputs": list(minibatch),
+                "outputs_before": eval_curr.outputs,
+                "outputs_after": [outputs_by_id[sid] for sid in subsample_ids],
             },
         )

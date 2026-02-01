@@ -584,6 +584,22 @@ class GEPAEngine(Generic[DataId, DataInst, Trajectory, RolloutOutput]):
                         minibatch_score_after=new_sum,
                         accepted=False,
                     )
+                    # Log minibatch outputs for rejected proposal
+                    self.experiment_tracker.log_minibatch_outputs_table(
+                        iteration=state.i,
+                        sample_ids=proposal.subsample_indices or [],
+                        sample_inputs=proposal.metadata.get("subsample_inputs", []),
+                        parent_candidate_idx=parent_idx,
+                        new_candidate_idx=None,
+                        parent_candidate=(
+                            state.program_candidates[parent_idx] if parent_idx < len(state.program_candidates) else None
+                        ),
+                        new_candidate=proposal.candidate,
+                        outputs_before=proposal.metadata.get("outputs_before", []),
+                        outputs_after=proposal.metadata.get("outputs_after", []),
+                        scores_before=proposal.subsample_scores_before or [],
+                        scores_after=proposal.subsample_scores_after or [],
+                    )
                     # Notify candidate rejected
                     notify_callbacks(
                         self.callbacks,
@@ -609,6 +625,23 @@ class GEPAEngine(Generic[DataId, DataInst, Trajectory, RolloutOutput]):
                     parent_program_idx=proposal.parent_program_ids,
                 )
                 proposal_accepted = True
+
+                # Log minibatch outputs for accepted proposal
+                self.experiment_tracker.log_minibatch_outputs_table(
+                    iteration=state.i,
+                    sample_ids=proposal.subsample_indices or [],
+                    sample_inputs=proposal.metadata.get("subsample_inputs", []),
+                    parent_candidate_idx=parent_idx,
+                    new_candidate_idx=new_idx,
+                    parent_candidate=(
+                        state.program_candidates[parent_idx] if parent_idx < len(state.program_candidates) else None
+                    ),
+                    new_candidate=proposal.candidate,
+                    outputs_before=proposal.metadata.get("outputs_before", []),
+                    outputs_after=proposal.metadata.get("outputs_after", []),
+                    scores_before=proposal.subsample_scores_before or [],
+                    scores_after=proposal.subsample_scores_after or [],
+                )
 
                 # Publish accepted prompt with valset score
                 valset_score = self.val_evaluation_policy.get_valset_score(new_idx, state)

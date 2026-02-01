@@ -225,9 +225,113 @@ class ExperimentTracker:
             outputs_columns = ["candidate_idx", "val_id", "candidate_content", "input", "output", "score"]
             outputs_table = wandb.Table(data=self._outputs_rows, columns=outputs_columns)
 
-            wandb.log({"candidate_prompts": prompts_table, "candidate_outputs": outputs_table})
+            wandb.log({"candidate_prompts": prompts_table, "valset_outputs": outputs_table})
         except Exception as e:
             print(f"Warning: Failed to log tables: {e}")
+
+    def log_sample_weights_table(
+        self,
+        weights: dict[Any, float],
+        iteration: int,
+        table_name: str = "train_sample_weights",
+    ) -> None:
+        """Log per-sample weights as a wandb.Table.
+
+        Args:
+            weights: Dictionary mapping sample_id to weight.
+            iteration: The GEPA iteration number.
+            table_name: Name for the wandb table (default: "sample_weights").
+        """
+        if not self.use_weave:
+            return
+        try:
+            import wandb
+
+            rows = [[iteration, str(sample_id), weight] for sample_id, weight in weights.items()]
+            columns = ["iteration", "sample_id", "weight"]
+            table = wandb.Table(data=rows, columns=columns)
+            wandb.log({table_name: table})
+        except Exception as e:
+            print(f"Warning: Failed to log sample weights table: {e}")
+
+    def log_minibatch_outputs_table(
+        self,
+        iteration: int,
+        sample_ids: list[Any],
+        sample_inputs: list[Any],
+        parent_candidate_idx: int | None,
+        new_candidate_idx: int | None,
+        parent_candidate: dict[str, str] | None,
+        new_candidate: dict[str, str],
+        outputs_before: list[Any],
+        outputs_after: list[Any],
+        scores_before: list[float],
+        scores_after: list[float],
+    ) -> None:
+        """Log minibatch sample-level results as a wandb.Table.
+
+        Each row records the evaluation result of one minibatch sample.
+
+        Args:
+            iteration: GEPA iteration number.
+            sample_ids: Training sample IDs in the minibatch.
+            sample_inputs: Input data for each sample.
+            parent_candidate_idx: Index of the parent candidate.
+            new_candidate_idx: Index of the new candidate (if accepted).
+            parent_candidate: Content of the parent candidate.
+            new_candidate: Content of the new candidate.
+            outputs_before: Parent candidate's output for each sample.
+            outputs_after: New candidate's output for each sample.
+            scores_before: Parent candidate's score for each sample.
+            scores_after: New candidate's score for each sample.
+        """
+        if not self.use_weave:
+            return
+        try:
+            import json
+
+            import wandb
+
+            rows = []
+            for i, sample_id in enumerate(sample_ids):
+                sample_input = sample_inputs[i] if i < len(sample_inputs) else None
+                output_before = outputs_before[i] if i < len(outputs_before) else None
+                output_after = outputs_after[i] if i < len(outputs_after) else None
+                score_before = scores_before[i] if i < len(scores_before) else None
+                score_after = scores_after[i] if i < len(scores_after) else None
+                rows.append(
+                    [
+                        iteration,
+                        str(sample_id),
+                        json.dumps(sample_input, default=str) if sample_input is not None else None,
+                        parent_candidate_idx,
+                        new_candidate_idx,
+                        json.dumps(parent_candidate) if parent_candidate else None,
+                        json.dumps(new_candidate),
+                        json.dumps(output_before, default=str) if output_before is not None else None,
+                        json.dumps(output_after, default=str) if output_after is not None else None,
+                        score_before,
+                        score_after,
+                    ]
+                )
+
+            columns = [
+                "iteration",
+                "train_sample_id",
+                "input",
+                "parent_candidate_idx",
+                "new_candidate_idx",
+                "parent_candidate",
+                "new_candidate",
+                "output_before",
+                "output_after",
+                "score_before",
+                "score_after",
+            ]
+            table = wandb.Table(data=rows, columns=columns)
+            wandb.log({"minibatch_outputs": table})
+        except Exception as e:
+            print(f"Warning: Failed to log minibatch outputs table: {e}")
 
 
 def create_experiment_tracker(

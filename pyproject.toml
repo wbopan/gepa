@@ -24,6 +24,7 @@ dependencies = [
     "weave[litellm]>=0.51.0",
     "redis>=7.1.0",
     "gql>=4.0.0",
+    "scipy>=1.15.3",
 ]
 
 [project.optional-dependencies]

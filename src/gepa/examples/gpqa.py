@@ -44,7 +44,7 @@ def init_dataset():
         correct_letter = r"\box{" + ["A", "B", "C", "D"][answers.index(correct_answer)] + "}"
 
         # Format choices with proper A, B, C, D labels
-        choices = [f"{letter}) {ans}" for letter, ans in zip(["A", "B", "C", "D"], answers)]
+        choices = [f"{letter}) {ans}" for letter, ans in zip(["A", "B", "C", "D"], answers, strict=True)]
         formatted_input = f"{question}\n\n" + "\n".join(choices)
 
         return {

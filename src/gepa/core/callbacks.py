@@ -662,7 +662,7 @@ class LiteLLMCacheLogger(_get_litellm_base_class()):
 
         self._logger.debug(f"[{datetime.now().strftime('%H:%M:%S.%f')[:-3]}] {model}", header="request")
 
-    def log_success_event(  # noqa: PLR0913
+    def log_success_event(
         self,
         kwargs: Any,
         response_obj: Any = None,

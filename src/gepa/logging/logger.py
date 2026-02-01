@@ -12,7 +12,7 @@ from rich.panel import Panel
 
 
 class LoggerProtocol(Protocol):
-    def log(self, message: str): ...
+    def log(self, message: str, header: str | None = None): ...
 
 
 # Color palette for header hashing
@@ -101,7 +101,7 @@ def get_logger() -> RichLogger:
 
 
 class StdOutLogger(LoggerProtocol):
-    def log(self, message: str):
+    def log(self, message: str, header: str | None = None):
         print(message)
 
 

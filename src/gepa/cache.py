@@ -32,7 +32,7 @@ def configure_cache(
         configure_cache("r2")
     """
     import litellm
-    from litellm import Cache
+    from litellm.caching.caching import Cache
 
     if backend == "disk":
         cache_dir = kwargs.pop("disk_cache_dir", os.path.expanduser("~/.cache/litellm"))

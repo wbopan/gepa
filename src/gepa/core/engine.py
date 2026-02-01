@@ -239,7 +239,7 @@ class GEPAEngine(Generic[DataId, DataInst, Trajectory, RolloutOutput]):
 
         # Add new candidate to wandb tables
         all_val_ids = list(valset_evaluation.scores_by_val_id.keys())
-        valset_inputs = {vid: inst for vid, inst in zip(all_val_ids, valset.fetch(all_val_ids), strict=False)}
+        valset_inputs = dict(zip(all_val_ids, valset.fetch(all_val_ids), strict=False))
         self.experiment_tracker.add_candidate_to_tables(
             candidate_idx=new_program_idx,
             candidate=new_program,
@@ -404,9 +404,7 @@ class GEPAEngine(Generic[DataId, DataInst, Trajectory, RolloutOutput]):
 
         # Add seed candidate to wandb tables
         all_seed_val_ids = list(seed_scores.keys())
-        seed_valset_inputs = {
-            vid: inst for vid, inst in zip(all_seed_val_ids, valset.fetch(all_seed_val_ids), strict=False)
-        }
+        seed_valset_inputs = dict(zip(all_seed_val_ids, valset.fetch(all_seed_val_ids), strict=False))
         self.experiment_tracker.add_candidate_to_tables(
             candidate_idx=0,
             candidate=self.seed_candidate,

@@ -139,7 +139,7 @@ class DefaultAdapter(GEPAAdapter[DefaultDataInst, DefaultTrajectory, DefaultRoll
                 **self.litellm_batch_completion_kwargs,
             )
             responses = []
-            for i, resp in enumerate(raw_responses):
+            for resp in raw_responses:
                 if isinstance(resp, Exception):
                     raise resp
                 responses.append(resp.choices[0].message.content.strip())

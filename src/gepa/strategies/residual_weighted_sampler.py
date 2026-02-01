@@ -46,6 +46,29 @@ class ResidualWeightedSampler:
         self._weights = [1.0] * self.n
         self._accumulators = [0.0] * self.n
 
+    def extend(self, new_n: int) -> None:
+        """Extend the sampler to support more elements.
+
+        Preserves accumulated credit of existing elements, ensuring fairness
+        is not reset when the candidate pool grows.
+
+        Args:
+            new_n: The new total number of elements. Must be >= current n.
+
+        Raises:
+            ValueError: If new_n < current n.
+        """
+        if new_n < self.n:
+            raise ValueError(f"Cannot shrink sampler from {self.n} to {new_n}")
+
+        if new_n == self.n:
+            return
+
+        diff = new_n - self.n
+        self._weights.extend([0.0] * diff)
+        self._accumulators.extend([0.0] * diff)
+        self.n = new_n
+
     def update_weights(self, weights: list[float]) -> None:
         """Update weights while preserving accumulator state.
 
@@ -53,14 +76,19 @@ class ResidualWeightedSampler:
         The accumulator state is preserved, so partial progress toward
         the next sample is not lost.
 
+        If the provided weights list is longer than current n, the sampler
+        automatically extends to accommodate new elements.
+
         Args:
-            weights: New weights for each element. Must have length n.
+            weights: New weights for each element. Must have length >= n.
 
         Raises:
-            ValueError: If weights length doesn't match n.
+            ValueError: If weights length is smaller than current n.
         """
-        if len(weights) != self.n:
-            raise ValueError(f"Weights length must be {self.n}, got {len(weights)}")
+        if len(weights) > self.n:
+            self.extend(len(weights))
+        elif len(weights) < self.n:
+            raise ValueError(f"Weights length {len(weights)} cannot be smaller than n={self.n}")
         self._weights = list(weights)
 
     def sample(self, k: int = 1, unique: bool = True) -> list[int]:

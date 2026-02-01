@@ -91,13 +91,28 @@ class MaxFamilyScoreCandidateSelector(CandidateSelector):
     having high-variance children, this selector rewards candidates for their
     best offspring performance.
 
+    Uses normalized power transform for selection pressure:
+        weight = score^power / sum(scores^power)
+
+    This ensures:
+        - High scorers are selected much more often (0.8 vs 0.4 = 8x with power=3)
+        - But low scorers still get occasional chances (exploration)
+        - Weights sum to 1.0, matching k=1 sampling rate
+
     Uses ResidualWeightedSampler to ensure all candidates get eventual
     selection opportunities proportional to their family scores, avoiding
     degenerate greedy selection.
+
+    Args:
+        power: Exponent for selection pressure. Higher = more greedy.
+            - power=2: Mild pressure (0.8 vs 0.4 = 4x)
+            - power=3: Balanced (0.8 vs 0.4 = 8x) [default]
+            - power=4: Aggressive (0.8 vs 0.4 = 16x)
     """
 
-    def __init__(self):
+    def __init__(self, power: float = 3.0):
         self._sampler: ResidualWeightedSampler | None = None
+        self._power = power
 
     def select_candidate_idx(self, state: GEPAState) -> int:
         assert len(state.program_full_scores_val_set) == len(state.program_candidates)
@@ -119,10 +134,21 @@ class MaxFamilyScoreCandidateSelector(CandidateSelector):
                 family_score = parent_score
             family_scores.append(family_score)
 
-        # Initialize or resize sampler
-        if self._sampler is None or self._sampler.n != n:
+        # Apply power transform for selection pressure
+        raw_weights = [max(0.0, s) ** self._power for s in family_scores]
+
+        # Normalize to sum=1.0 (required for k=1 sampling rate)
+        total_weight = sum(raw_weights)
+        if total_weight < 1e-9:
+            # All scores near zero: fall back to uniform
+            weights = [1.0 / n] * n
+        else:
+            weights = [w / total_weight for w in raw_weights]
+
+        # Initialize sampler on first call; update_weights handles extension automatically
+        if self._sampler is None:
             self._sampler = ResidualWeightedSampler(n)
 
-        # Update weights and sample
-        self._sampler.update_weights(family_scores)
+        # Update weights (auto-extends if n grew) and sample
+        self._sampler.update_weights(weights)
         return self._sampler.sample(k=1)[0]

@@ -181,10 +181,10 @@ class TestResidualWeightedSampler:
         assert counts[2] == 3
 
     def test_invalid_weights_length_raises(self):
-        """Updating with wrong length weights should raise ValueError."""
+        """Updating with shorter weights should raise ValueError."""
         sampler = ResidualWeightedSampler(3)
 
-        with pytest.raises(ValueError, match="Weights length must be 3"):
+        with pytest.raises(ValueError, match="cannot be smaller"):
             sampler.update_weights([1.0, 2.0])
 
     def test_order_is_round_robin_with_weights(self):
@@ -313,3 +313,171 @@ class TestResidualWeightedSamplerUnique:
         # With unique=True (default), no duplicates in batch of 2
         result = sampler.sample(2)
         assert len(set(result)) == 2
+
+
+class TestResidualWeightedSamplerExtend:
+    """Tests for extend() and dynamic growth behavior."""
+
+    def test_extend_increases_size(self):
+        """extend() should increase n and add new slots."""
+        sampler = ResidualWeightedSampler(3)
+        sampler.update_weights([1.0, 2.0, 0.5])
+
+        sampler.extend(5)
+
+        assert sampler.n == 5
+        assert len(sampler._weights) == 5
+        assert len(sampler._accumulators) == 5
+
+    def test_extend_preserves_existing_weights(self):
+        """extend() should preserve existing weights."""
+        sampler = ResidualWeightedSampler(3)
+        sampler.update_weights([1.0, 2.0, 0.5])
+
+        sampler.extend(5)
+
+        assert sampler._weights[:3] == [1.0, 2.0, 0.5]
+        assert sampler._weights[3:] == [0.0, 0.0]
+
+    def test_extend_preserves_existing_accumulators(self):
+        """extend() should preserve existing accumulator state."""
+        sampler = ResidualWeightedSampler(3)
+        sampler.update_weights([1.0, 2.0, 0.5])
+
+        # Advance state to build up accumulators
+        sampler.sample(2, unique=False)
+        old_accumulators = sampler._accumulators.copy()
+
+        sampler.extend(5)
+
+        # Original accumulators should be preserved
+        assert sampler._accumulators[:3] == old_accumulators
+        # New accumulators should be 0.0
+        assert sampler._accumulators[3:] == [0.0, 0.0]
+
+    def test_extend_preserves_cursor(self):
+        """extend() should preserve cursor position."""
+        sampler = ResidualWeightedSampler(3)
+        sampler.update_weights([1.0, 1.0, 1.0])
+
+        # Advance cursor
+        sampler.sample(2)
+        old_cursor = sampler._cursor
+
+        sampler.extend(5)
+
+        assert sampler._cursor == old_cursor
+
+    def test_extend_new_elements_start_at_zero(self):
+        """New elements should start with accumulator=0.0 (no unearned credit)."""
+        sampler = ResidualWeightedSampler(2)
+        sampler.update_weights([1.0, 1.0])
+
+        # Build up accumulators
+        for _ in range(5):
+            sampler.sample(1)
+
+        sampler.extend(4)
+
+        # New elements should have 0.0 accumulator
+        assert sampler._accumulators[2] == 0.0
+        assert sampler._accumulators[3] == 0.0
+
+    def test_extend_same_size_is_noop(self):
+        """extend() with same size should be a no-op."""
+        sampler = ResidualWeightedSampler(3)
+        sampler.update_weights([1.0, 2.0, 0.5])
+
+        old_state = (sampler._weights.copy(), sampler._accumulators.copy(), sampler._cursor)
+        sampler.extend(3)
+
+        assert (sampler._weights, sampler._accumulators, sampler._cursor) == old_state
+
+    def test_extend_shrink_raises(self):
+        """extend() with smaller size should raise ValueError."""
+        sampler = ResidualWeightedSampler(5)
+
+        with pytest.raises(ValueError, match="Cannot shrink"):
+            sampler.extend(3)
+
+    def test_update_weights_auto_extends(self):
+        """update_weights() should auto-extend when given longer list."""
+        sampler = ResidualWeightedSampler(3)
+        sampler.update_weights([1.0, 2.0, 0.5])
+
+        # Update with longer list - should auto-extend
+        sampler.update_weights([1.0, 2.0, 0.5, 3.0, 1.5])
+
+        assert sampler.n == 5
+        assert sampler._weights == [1.0, 2.0, 0.5, 3.0, 1.5]
+
+    def test_update_weights_shrink_raises(self):
+        """update_weights() with shorter list should raise ValueError."""
+        sampler = ResidualWeightedSampler(5)
+        sampler.update_weights([1.0] * 5)
+
+        with pytest.raises(ValueError, match="cannot be smaller"):
+            sampler.update_weights([1.0, 2.0, 0.5])
+
+    def test_extend_then_sample_includes_new_elements(self):
+        """After extending, new elements should be reachable by sampling."""
+        sampler = ResidualWeightedSampler(2)
+        sampler.update_weights([1.0, 1.0])
+
+        sampler.extend(4)
+        sampler.update_weights([1.0, 1.0, 1.0, 1.0])
+
+        # Sample all 4 elements
+        result = sampler.sample(4)
+        assert sorted(result) == [0, 1, 2, 3]
+
+    def test_growing_pool_fairness(self):
+        """Simulate evolutionary algorithm: growing pool should maintain fairness."""
+        sampler = ResidualWeightedSampler(2)
+        sampler.update_weights([1.0, 1.0])
+
+        counts = Counter()
+
+        # Phase 1: sample from 2 elements
+        for _ in range(10):
+            result = sampler.sample(1)
+            counts.update(result)
+
+        # Phase 2: grow to 4 elements
+        sampler.update_weights([1.0, 1.0, 1.0, 1.0])
+
+        # Phase 3: sample from 4 elements
+        for _ in range(20):
+            result = sampler.sample(1)
+            counts.update(result)
+
+        # All elements should have been sampled
+        assert all(counts[i] > 0 for i in range(4))
+
+        # New elements (2, 3) should have fewer samples since they were added later
+        # Old elements (0, 1) were sampled in Phase 1 + Phase 3
+        # New elements (2, 3) only in Phase 3
+        assert counts[0] >= counts[2]
+        assert counts[1] >= counts[3]
+
+    def test_growing_pool_preserves_accumulated_credit(self):
+        """Growing pool should not reset accumulated credit of existing elements."""
+        sampler = ResidualWeightedSampler(2)
+        sampler.update_weights([0.3, 0.3])
+
+        # Accumulate credit without emitting (weight < 1, so need multiple rounds)
+        for _ in range(3):
+            sampler._accumulators[0] += 0.3
+            sampler._accumulators[1] += 0.3
+
+        # Accumulators should be ~0.9 each
+        acc_before = sampler._accumulators.copy()
+
+        # Grow the pool
+        sampler.update_weights([0.3, 0.3, 1.0])
+
+        # Original accumulators should be preserved
+        assert sampler._accumulators[0] == pytest.approx(acc_before[0], rel=0.01)
+        assert sampler._accumulators[1] == pytest.approx(acc_before[1], rel=0.01)
+        # New element starts at 0
+        assert sampler._accumulators[2] == 0.0

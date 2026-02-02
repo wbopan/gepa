@@ -37,3 +37,14 @@ When modifying existing code or adding new features:
 - **Follow existing patterns**: Study how similar functionality is implemented elsewhere in the codebase and mirror those conventions.
 - **Logging**: Use `get_logger()` from `gepa.logging` instead of Python's built-in `logging` or `print()`. Use `logger.log(msg, header="...")` for important messages with semantic headers (e.g., `"select"`, `"score"`, `"error"`), and `logger.debug()` for verbose output (enabled via `LOG_LEVEL=DEBUG`).
 - **Experiment tracking**: Runs are logged to Weights & Biases (wandb). Use the MCP wandb tools to query run metrics and check experiment status (entity: `bmpixel`, project: `gepa-boost`).
+
+## Key Concepts
+
+### Trainset vs Valset
+
+**Minibatch IDs → trainset, not valset.** This is a common source of confusion.
+
+- **Trainset**: Minibatch sampling for mutation feedback (`minibatch_outputs`, `train_sample_weights`)
+- **Valset**: Full evaluation for Pareto tracking (`valset_outputs`, `pareto/val_candidates.*`)
+
+See `knowledge/trainset_vs_valset.md` and `knowledge/wandb_tables_and_metrics.md` for details.

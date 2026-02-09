@@ -96,49 +96,48 @@ class TestBayesianBatchSampler:
 
     def test_balanced_samples_have_high_score(self):
         """Test that samples with balanced success/failure have high scores."""
-        sampler = BayesianBatchSampler(minibatch_size=2, binarize_threshold=0.5)
+        sampler = BayesianBatchSampler(minibatch_size=2)
         loader = MockDataLoader([0, 1, 2])
         state = MockGEPAState()
 
         sampler.next_minibatch_ids(loader, state)
 
-        # Sample 0: 2 successes, 2 failures (frontier)
-        # Sample 1: 4 successes, 0 failures (one-sided)
-        # Sample 2: 0 successes, 4 failures (one-sided)
-        state.full_program_trace.append({"subsample_ids": [0, 1, 2], "subsample_scores": [0.6, 0.8, 0.2]})
+        # Sample 0: balanced scores around 0.5 (frontier)
+        # Sample 1: high scores (one-sided successes)
+        # Sample 2: low scores (one-sided failures)
+        state.full_program_trace.append({"subsample_ids": [0, 1, 2], "subsample_scores": [0.6, 0.9, 0.1]})
         state.full_program_trace.append({"subsample_ids": [0, 1, 2], "subsample_scores": [0.4, 0.9, 0.1]})
-        state.full_program_trace.append({"subsample_ids": [0, 1, 2], "subsample_scores": [0.7, 0.7, 0.3]})
-        state.full_program_trace.append({"subsample_ids": [0, 1, 2], "subsample_scores": [0.3, 0.6, 0.4]})
+        state.full_program_trace.append({"subsample_ids": [0, 1, 2], "subsample_scores": [0.6, 0.9, 0.1]})
+        state.full_program_trace.append({"subsample_ids": [0, 1, 2], "subsample_scores": [0.4, 0.9, 0.1]})
 
         sampler.next_minibatch_ids(loader, state)
         scores = sampler.get_scores()
 
-        # Sample 0 has the most balanced history (2s, 2f)
-        # Sample 1 has all successes (4s, 0f)
-        # Sample 2 has all failures (0s, 4f)
+        # Sample 0 has balanced fractional counts (2.0 successes, 2.0 failures)
+        # Sample 1 has mostly successes (3.6 successes, 0.4 failures)
+        # Sample 2 has mostly failures (0.4 successes, 3.6 failures)
         assert scores[0] > scores[1]
         assert scores[0] > scores[2]
-        assert scores[1] == scores[2]  # Symmetric
+        assert scores[1] == pytest.approx(scores[2])  # Symmetric
 
-    def test_binarize_threshold(self):
-        """Test that binarize_threshold correctly classifies scores."""
-        sampler = BayesianBatchSampler(minibatch_size=2, binarize_threshold=0.7)
+    def test_fractional_counts(self):
+        """Test that continuous scores produce fractional success/failure counts."""
+        sampler = BayesianBatchSampler(minibatch_size=2)
         loader = MockDataLoader([0, 1])
         state = MockGEPAState()
 
         sampler.next_minibatch_ids(loader, state)
 
-        # With threshold 0.7:
-        # Sample 0: 0.6, 0.8 -> 0 success, 1 failure; 1 success -> (1, 1)
-        # Sample 1: 0.5, 0.5 -> 0 success, 2 failures -> (0, 2)
+        # Sample 0: 0.6 + 0.8 = 1.4 successes, 0.4 + 0.2 = 0.6 failures
+        # Sample 1: 0.5 + 0.5 = 1.0 successes, 0.5 + 0.5 = 1.0 failures
         state.full_program_trace.append({"subsample_ids": [0, 1], "subsample_scores": [0.6, 0.5]})
         state.full_program_trace.append({"subsample_ids": [0, 1], "subsample_scores": [0.8, 0.5]})
 
         sampler.next_minibatch_ids(loader, state)
         counts = sampler.get_counts()
 
-        assert counts[0] == (1, 1)  # 0.8 >= 0.7 is success, 0.6 < 0.7 is failure
-        assert counts[1] == (0, 2)  # Both < 0.7 are failures
+        assert counts[0] == pytest.approx((1.4, 0.6))
+        assert counts[1] == pytest.approx((1.0, 1.0))  # Perfectly balanced
 
     def test_empty_loader_raises(self):
         """Test that empty loader raises ValueError."""
@@ -315,18 +314,18 @@ class TestBayesianBatchSamplerWindow:
 
         sampler.next_minibatch_ids(loader, state)
 
-        # Add 4 traces
-        state.full_program_trace.append({"subsample_ids": [0, 1], "subsample_scores": [0.6, 0.4]})
-        state.full_program_trace.append({"subsample_ids": [0, 1], "subsample_scores": [0.6, 0.4]})
-        state.full_program_trace.append({"subsample_ids": [0, 1], "subsample_scores": [0.6, 0.4]})
-        state.full_program_trace.append({"subsample_ids": [0, 1], "subsample_scores": [0.6, 0.4]})
+        # Add 4 traces with binary scores (0.0 and 1.0) to verify backward compatibility
+        state.full_program_trace.append({"subsample_ids": [0, 1], "subsample_scores": [1.0, 0.0]})
+        state.full_program_trace.append({"subsample_ids": [0, 1], "subsample_scores": [1.0, 0.0]})
+        state.full_program_trace.append({"subsample_ids": [0, 1], "subsample_scores": [1.0, 0.0]})
+        state.full_program_trace.append({"subsample_ids": [0, 1], "subsample_scores": [1.0, 0.0]})
 
         sampler.next_minibatch_ids(loader, state)
         counts = sampler.get_counts()
 
-        # All 4 traces should be counted
-        assert counts[0] == (4, 0)  # 4 successes
-        assert counts[1] == (0, 4)  # 4 failures
+        # All 4 traces should be counted with binary scores
+        assert counts[0] == pytest.approx((4.0, 0.0))  # 4 successes
+        assert counts[1] == pytest.approx((0.0, 4.0))  # 4 failures
 
     def test_window_limits_history(self):
         """Test that window limits history to recent traces only."""
@@ -337,14 +336,15 @@ class TestBayesianBatchSamplerWindow:
         sampler.next_minibatch_ids(loader, state)
 
         # Add 4 traces - sample 0 starts failing, sample 1 starts succeeding
+        # Use binary scores (0.0 and 1.0) for clarity
         # Trace 0: sample 0 success, sample 1 failure
-        state.full_program_trace.append({"subsample_ids": [0, 1], "subsample_scores": [0.6, 0.4]})
+        state.full_program_trace.append({"subsample_ids": [0, 1], "subsample_scores": [1.0, 0.0]})
         # Trace 1: sample 0 success, sample 1 failure
-        state.full_program_trace.append({"subsample_ids": [0, 1], "subsample_scores": [0.6, 0.4]})
+        state.full_program_trace.append({"subsample_ids": [0, 1], "subsample_scores": [1.0, 0.0]})
         # Trace 2: sample 0 failure, sample 1 success
-        state.full_program_trace.append({"subsample_ids": [0, 1], "subsample_scores": [0.4, 0.6]})
+        state.full_program_trace.append({"subsample_ids": [0, 1], "subsample_scores": [0.0, 1.0]})
         # Trace 3: sample 0 failure, sample 1 success
-        state.full_program_trace.append({"subsample_ids": [0, 1], "subsample_scores": [0.4, 0.6]})
+        state.full_program_trace.append({"subsample_ids": [0, 1], "subsample_scores": [0.0, 1.0]})
 
         sampler.next_minibatch_ids(loader, state)
         counts = sampler.get_counts()
@@ -352,8 +352,8 @@ class TestBayesianBatchSamplerWindow:
         # With window=2, only traces 2 and 3 are counted
         # Sample 0: 0 successes, 2 failures (traces 2, 3)
         # Sample 1: 2 successes, 0 failures (traces 2, 3)
-        assert counts[0] == (0, 2)
-        assert counts[1] == (2, 0)
+        assert counts[0] == pytest.approx((0.0, 2.0))
+        assert counts[1] == pytest.approx((2.0, 0.0))
 
     def test_window_allows_weight_recovery(self):
         """Test that samples can regain priority when recent candidates solve them."""
@@ -363,21 +363,21 @@ class TestBayesianBatchSamplerWindow:
 
         sampler.next_minibatch_ids(loader, state)
 
-        # Initially sample 0 always succeeds, sample 1 always fails
-        state.full_program_trace.append({"subsample_ids": [0, 1], "subsample_scores": [0.9, 0.3]})
-        state.full_program_trace.append({"subsample_ids": [0, 1], "subsample_scores": [0.9, 0.3]})
+        # Initially sample 0 always succeeds, sample 1 always fails (binary scores)
+        state.full_program_trace.append({"subsample_ids": [0, 1], "subsample_scores": [1.0, 0.0]})
+        state.full_program_trace.append({"subsample_ids": [0, 1], "subsample_scores": [1.0, 0.0]})
 
         sampler.next_minibatch_ids(loader, state)
         counts_after_initial = sampler.get_counts()
 
         # Sample 0 has (2, 0) in window -> one-sided success
         # Sample 1 has (0, 2) in window -> one-sided failure
-        assert counts_after_initial[0] == (2, 0)
-        assert counts_after_initial[1] == (0, 2)
+        assert counts_after_initial[0] == pytest.approx((2.0, 0.0))
+        assert counts_after_initial[1] == pytest.approx((0.0, 2.0))
 
         # Now sample 0 starts failing, sample 1 starts succeeding
-        state.full_program_trace.append({"subsample_ids": [0, 1], "subsample_scores": [0.3, 0.9]})
-        state.full_program_trace.append({"subsample_ids": [0, 1], "subsample_scores": [0.3, 0.9]})
+        state.full_program_trace.append({"subsample_ids": [0, 1], "subsample_scores": [0.0, 1.0]})
+        state.full_program_trace.append({"subsample_ids": [0, 1], "subsample_scores": [0.0, 1.0]})
 
         sampler.next_minibatch_ids(loader, state)
         counts_after_change = sampler.get_counts()
@@ -386,8 +386,8 @@ class TestBayesianBatchSamplerWindow:
         # Sample 0: (0, 2) -> one-sided failure (old successes forgotten!)
         # Sample 1: (2, 0) -> one-sided success (old failures forgotten!)
         # The key is that both samples' old outcomes are forgotten
-        assert counts_after_change[0] == (0, 2)  # Old successes forgotten
-        assert counts_after_change[1] == (2, 0)  # Old failures forgotten
+        assert counts_after_change[0] == pytest.approx((0.0, 2.0))  # Old successes forgotten
+        assert counts_after_change[1] == pytest.approx((2.0, 0.0))  # Old failures forgotten
 
     def test_window_one_uses_only_latest_trace(self):
         """Test that window=1 uses only the most recent trace."""
@@ -397,16 +397,16 @@ class TestBayesianBatchSamplerWindow:
 
         sampler.next_minibatch_ids(loader, state)
 
-        # Add multiple traces with alternating outcomes
-        state.full_program_trace.append({"subsample_ids": [0], "subsample_scores": [0.6]})  # success
-        state.full_program_trace.append({"subsample_ids": [0], "subsample_scores": [0.4]})  # failure
-        state.full_program_trace.append({"subsample_ids": [0], "subsample_scores": [0.6]})  # success
+        # Add multiple traces with alternating outcomes (binary scores)
+        state.full_program_trace.append({"subsample_ids": [0], "subsample_scores": [1.0]})  # success
+        state.full_program_trace.append({"subsample_ids": [0], "subsample_scores": [0.0]})  # failure
+        state.full_program_trace.append({"subsample_ids": [0], "subsample_scores": [1.0]})  # success
 
         sampler.next_minibatch_ids(loader, state)
         counts = sampler.get_counts()
 
         # With window=1, only trace 2 (last one) counts
-        assert counts[0] == (1, 0)  # Only the last success
+        assert counts[0] == pytest.approx((1.0, 0.0))  # Only the last success
 
     def test_window_larger_than_history_uses_all(self):
         """Test that window larger than trace count uses all available traces."""
@@ -416,16 +416,118 @@ class TestBayesianBatchSamplerWindow:
 
         sampler.next_minibatch_ids(loader, state)
 
-        # Add only 3 traces
-        state.full_program_trace.append({"subsample_ids": [0], "subsample_scores": [0.6]})
-        state.full_program_trace.append({"subsample_ids": [0], "subsample_scores": [0.6]})
-        state.full_program_trace.append({"subsample_ids": [0], "subsample_scores": [0.4]})
+        # Add only 3 traces with binary scores
+        state.full_program_trace.append({"subsample_ids": [0], "subsample_scores": [1.0]})
+        state.full_program_trace.append({"subsample_ids": [0], "subsample_scores": [1.0]})
+        state.full_program_trace.append({"subsample_ids": [0], "subsample_scores": [0.0]})
 
         sampler.next_minibatch_ids(loader, state)
         counts = sampler.get_counts()
 
         # Window=10 but only 3 traces exist, so all are counted
-        assert counts[0] == (2, 1)
+        assert counts[0] == pytest.approx((2.0, 1.0))
+
+
+class TestFractionalCounting:
+    """Tests for fractional success/failure counting with continuous scores."""
+
+    def test_fractional_scores_produce_different_weights(self):
+        """Test that fractional scores produce different weights than binary."""
+        sampler = BayesianBatchSampler(minibatch_size=2)
+        loader = MockDataLoader([0, 1])
+        state = MockGEPAState()
+
+        sampler.next_minibatch_ids(loader, state)
+
+        # Sample 0: consistent 0.5 scores (perfectly balanced)
+        # Sample 1: alternating 0.0 and 1.0 (also perfectly balanced, but binary)
+        state.full_program_trace.append({"subsample_ids": [0, 1], "subsample_scores": [0.5, 0.0]})
+        state.full_program_trace.append({"subsample_ids": [0, 1], "subsample_scores": [0.5, 1.0]})
+
+        sampler.next_minibatch_ids(loader, state)
+        counts = sampler.get_counts()
+
+        # Both should have equal successes and failures
+        assert counts[0] == pytest.approx((1.0, 1.0))  # 0.5 + 0.5, 0.5 + 0.5
+        assert counts[1] == pytest.approx((1.0, 1.0))  # 0.0 + 1.0, 1.0 + 0.0
+
+    def test_score_0_5_produces_balanced_counts(self):
+        """Test that score 0.5 results in exactly balanced successes/failures."""
+        sampler = BayesianBatchSampler(minibatch_size=2)
+        loader = MockDataLoader([0])
+        state = MockGEPAState()
+
+        sampler.next_minibatch_ids(loader, state)
+
+        state.full_program_trace.append({"subsample_ids": [0], "subsample_scores": [0.5]})
+        state.full_program_trace.append({"subsample_ids": [0], "subsample_scores": [0.5]})
+        state.full_program_trace.append({"subsample_ids": [0], "subsample_scores": [0.5]})
+
+        sampler.next_minibatch_ids(loader, state)
+        counts = sampler.get_counts()
+
+        # 3 * 0.5 = 1.5 successes, 3 * 0.5 = 1.5 failures
+        assert counts[0] == pytest.approx((1.5, 1.5))
+
+    def test_partial_credit_scores(self):
+        """Test typical partial credit scores like 0.25, 0.5, 0.75."""
+        sampler = BayesianBatchSampler(minibatch_size=2)
+        loader = MockDataLoader([0])
+        state = MockGEPAState()
+
+        sampler.next_minibatch_ids(loader, state)
+
+        # Simulate NYT Connections style scores
+        state.full_program_trace.append({"subsample_ids": [0], "subsample_scores": [0.25]})  # 1 group correct
+        state.full_program_trace.append({"subsample_ids": [0], "subsample_scores": [0.50]})  # 2 groups correct
+        state.full_program_trace.append({"subsample_ids": [0], "subsample_scores": [0.75]})  # 3 groups correct
+        state.full_program_trace.append({"subsample_ids": [0], "subsample_scores": [1.00]})  # all correct
+
+        sampler.next_minibatch_ids(loader, state)
+        counts = sampler.get_counts()
+
+        # successes = 0.25 + 0.50 + 0.75 + 1.00 = 2.5
+        # failures = 0.75 + 0.50 + 0.25 + 0.00 = 1.5
+        assert counts[0] == pytest.approx((2.5, 1.5))
+
+    def test_scores_outside_0_1_are_clamped(self):
+        """Test that scores outside [0, 1] are clamped."""
+        sampler = BayesianBatchSampler(minibatch_size=2)
+        loader = MockDataLoader([0, 1])
+        state = MockGEPAState()
+
+        sampler.next_minibatch_ids(loader, state)
+
+        # Scores outside [0, 1] should be clamped
+        state.full_program_trace.append({"subsample_ids": [0, 1], "subsample_scores": [-0.5, 1.5]})
+
+        sampler.next_minibatch_ids(loader, state)
+        counts = sampler.get_counts()
+
+        # -0.5 clamped to 0.0, 1.5 clamped to 1.0
+        assert counts[0] == pytest.approx((0.0, 1.0))
+        assert counts[1] == pytest.approx((1.0, 0.0))
+
+    def test_backward_compatibility_with_binary_scores(self):
+        """Test that binary scores (0 and 1) work identically to before."""
+        sampler = BayesianBatchSampler(minibatch_size=2)
+        loader = MockDataLoader([0, 1])
+        state = MockGEPAState()
+
+        sampler.next_minibatch_ids(loader, state)
+
+        # Only binary scores
+        state.full_program_trace.append({"subsample_ids": [0, 1], "subsample_scores": [1, 0]})
+        state.full_program_trace.append({"subsample_ids": [0, 1], "subsample_scores": [1, 0]})
+        state.full_program_trace.append({"subsample_ids": [0, 1], "subsample_scores": [0, 1]})
+
+        sampler.next_minibatch_ids(loader, state)
+        counts = sampler.get_counts()
+
+        # Sample 0: 2 successes, 1 failure
+        # Sample 1: 1 success, 2 failures
+        assert counts[0] == pytest.approx((2.0, 1.0))
+        assert counts[1] == pytest.approx((1.0, 2.0))
 
 
 class TestResidualSamplerIntegration:

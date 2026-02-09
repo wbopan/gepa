@@ -8,15 +8,11 @@ import weave
 
 from gepa.core.adapter import DataInst, GEPAAdapter, RolloutOutput, Trajectory
 from gepa.core.callbacks import (
-    CandidateSelectedEvent,
     EvaluationEndEvent,
-    EvaluationSkippedEvent,
     EvaluationStartEvent,
     GEPACallback,
-    MinibatchSampledEvent,
     ProposalEndEvent,
     ProposalStartEvent,
-    ReflectiveDatasetBuiltEvent,
     notify_callbacks,
 )
 from gepa.core.data_loader import DataId, DataLoader, ensure_loader
@@ -28,7 +24,8 @@ from gepa.proposer.reflective_mutation.base import (
     LanguageModel,
     ReflectionComponentSelector,
 )
-from gepa.strategies.batch_sampler import BatchSampler, MetricLoggingBatchSampler
+from gepa.proposer.reflective_mutation.common import prepare_proposal_context
+from gepa.strategies.batch_sampler import BatchSampler
 from gepa.strategies.instruction_proposal import InstructionProposalSignature
 
 
@@ -106,203 +103,64 @@ class ReflectiveMutationProposer(ProposeNewCandidate[DataId]):
 
     @weave.op(name="gepa.propose.reflective_mutation")
     def propose(self, state: GEPAState) -> CandidateProposal | None:
-        i = state.i + 1
-
-        curr_prog_id = self.candidate_selector.select_candidate_idx(state)
-        curr_prog = state.program_candidates[curr_prog_id]
-        state.full_program_trace[-1]["selected_program_candidate"] = curr_prog_id
-        self.logger.log(
-            f"Iteration {i}: Selected program {curr_prog_id} score: {state.program_full_scores_val_set[curr_prog_id]}",
-            header="select",
+        # Use shared function for proposal preparation
+        ctx = prepare_proposal_context(
+            state=state,
+            trainset=self.trainset,
+            adapter=self.adapter,
+            candidate_selector=self.candidate_selector,
+            module_selector=self.module_selector,
+            batch_sampler=self.batch_sampler,
+            perfect_score=self.perfect_score,
+            skip_perfect_score=self.skip_perfect_score,
+            logger=self.logger,
+            experiment_tracker=self.experiment_tracker,
+            callbacks=self.callbacks,
         )
-
-        # Notify candidate selected
-        notify_callbacks(
-            self.callbacks,
-            "on_candidate_selected",
-            CandidateSelectedEvent(
-                iteration=i,
-                candidate_idx=curr_prog_id,
-                candidate=curr_prog,
-                score=state.program_full_scores_val_set[curr_prog_id],
-            ),
-        )
-
-        self.experiment_tracker.log_metrics({"candidate/selected_idx": curr_prog_id}, iteration=state.i)
-
-        subsample_ids = self.batch_sampler.next_minibatch_ids(self.trainset, state)
-        state.full_program_trace[-1]["subsample_ids"] = subsample_ids
-        minibatch = self.trainset.fetch(subsample_ids)
-
-        # Log metrics from weighted samplers if applicable
-        if isinstance(self.batch_sampler, MetricLoggingBatchSampler):
-            if batch_weights := self.batch_sampler.get_batch_weights():
-                batch_metrics = {"train/batch_weight_avg": sum(batch_weights) / len(batch_weights)}
-                self.logger.debug(f"Iteration {i}: Batch metrics: {batch_metrics}", header="metric")
-                self.experiment_tracker.log_metrics(batch_metrics, iteration=state.i)
-            if all_weights := self.batch_sampler.get_all_sample_weights():
-                weights = list(all_weights.values())
-                train_stats = {
-                    "train/weight_avg": sum(weights) / len(weights),
-                    "train/weight_max": max(weights),
-                    "train/weight_min": min(weights),
-                }
-                self.logger.debug(f"Iteration {i}: Train sample stats: {train_stats}", header="metric")
-                self.experiment_tracker.log_metrics(train_stats, iteration=state.i)
-                self.logger.debug(f"Iteration {i}: Logging {len(all_weights)} per-sample weights", header="metric")
-                self.experiment_tracker.log_sample_weights_table(all_weights, iteration=state.i)
-
-        # Notify minibatch sampled
-        notify_callbacks(
-            self.callbacks,
-            "on_minibatch_sampled",
-            MinibatchSampledEvent(
-                iteration=i,
-                minibatch_ids=subsample_ids,
-                trainset_size=len(self.trainset),
-            ),
-        )
-
-        # 1) Evaluate current program with traces
-        # Note: We don't use cache for capture_traces=True evaluations since we need fresh traces for reflection
-        curr_parent_ids = [p for p in state.parent_program_for_candidate[curr_prog_id] if p is not None]
-        is_seed_candidate = curr_prog_id == 0
-        notify_callbacks(
-            self.callbacks,
-            "on_evaluation_start",
-            EvaluationStartEvent(
-                iteration=i,
-                candidate_idx=curr_prog_id,
-                batch_size=len(minibatch),
-                capture_traces=True,
-                parent_ids=curr_parent_ids,
-                inputs=minibatch,
-                is_seed_candidate=is_seed_candidate,
-            ),
-        )
-        eval_curr = self.adapter.evaluate(minibatch, curr_prog, capture_traces=True)
-        state.increment_evals(len(subsample_ids))
-        state.full_program_trace[-1]["subsample_scores"] = eval_curr.scores
-        notify_callbacks(
-            self.callbacks,
-            "on_evaluation_end",
-            EvaluationEndEvent(
-                iteration=i,
-                candidate_idx=curr_prog_id,
-                scores=eval_curr.scores,
-                has_trajectories=bool(eval_curr.trajectories),
-                parent_ids=curr_parent_ids,
-                outputs=eval_curr.outputs,
-                trajectories=eval_curr.trajectories,
-                objective_scores=eval_curr.objective_scores,
-                is_seed_candidate=is_seed_candidate,
-            ),
-        )
-
-        # Update cache with current program evaluation results (for future reuse when capture_traces=False)
-        if state.evaluation_cache is not None:
-            objective_scores_list = list(eval_curr.objective_scores) if eval_curr.objective_scores else None
-            state.evaluation_cache.put_batch(
-                curr_prog, subsample_ids, eval_curr.outputs, eval_curr.scores, objective_scores_list
-            )
-
-        if not eval_curr.trajectories or len(eval_curr.trajectories) == 0:
-            self.logger.log(f"Iteration {i}: No trajectories captured. Skipping.", header="skip")
-            notify_callbacks(
-                self.callbacks,
-                "on_evaluation_skipped",
-                EvaluationSkippedEvent(
-                    iteration=i,
-                    candidate_idx=curr_prog_id,
-                    reason="no_trajectories",
-                    scores=eval_curr.scores,
-                    is_seed_candidate=is_seed_candidate,
-                ),
-            )
+        if ctx is None:
             return None
 
-        if self.skip_perfect_score and all(s >= self.perfect_score for s in eval_curr.scores):
-            self.logger.log(f"Iteration {i}: All subsample scores perfect. Skipping.", header="skip")
-            notify_callbacks(
-                self.callbacks,
-                "on_evaluation_skipped",
-                EvaluationSkippedEvent(
-                    iteration=i,
-                    candidate_idx=curr_prog_id,
-                    reason="all_scores_perfect",
-                    scores=eval_curr.scores,
-                    is_seed_candidate=is_seed_candidate,
-                ),
-            )
-            return None
-
-        self.experiment_tracker.log_metrics({"train/batch_score_before": sum(eval_curr.scores)}, iteration=state.i)
-
-        # 2) Decide which predictors to update
-        predictor_names_to_update = self.module_selector(
-            state, eval_curr.trajectories, eval_curr.scores, curr_prog_id, curr_prog
-        )
-
-        # 3) Build reflective dataset and propose texts
+        # Build reflective dataset and propose texts
         try:
-            reflective_dataset = self.adapter.make_reflective_dataset(curr_prog, eval_curr, predictor_names_to_update)
-
-            # Convert to concrete types for callback
-            reflective_dataset_concrete: dict[str, list[dict[str, Any]]] = {
-                k: [dict(item) for item in v] for k, v in reflective_dataset.items()
-            }
-
-            # Notify reflective dataset built
-            notify_callbacks(
-                self.callbacks,
-                "on_reflective_dataset_built",
-                ReflectiveDatasetBuiltEvent(
-                    iteration=i,
-                    candidate_idx=curr_prog_id,
-                    components=predictor_names_to_update,
-                    dataset=reflective_dataset_concrete,
-                ),
-            )
-
             # Notify proposal start
             notify_callbacks(
                 self.callbacks,
                 "on_proposal_start",
                 ProposalStartEvent(
-                    iteration=i,
-                    parent_candidate=curr_prog,
-                    components=predictor_names_to_update,
-                    reflective_dataset=reflective_dataset_concrete,
+                    iteration=ctx.iteration,
+                    parent_candidate=ctx.parent_candidate,
+                    components=ctx.components_to_update,
+                    reflective_dataset=ctx.reflective_dataset,
                 ),
             )
 
-            new_texts = self.propose_new_texts(curr_prog, reflective_dataset, predictor_names_to_update)
+            new_texts = self.propose_new_texts(ctx.parent_candidate, ctx.reflective_dataset, ctx.components_to_update)
 
             # Notify proposal end
             notify_callbacks(
                 self.callbacks,
                 "on_proposal_end",
                 ProposalEndEvent(
-                    iteration=i,
+                    iteration=ctx.iteration,
                     new_instructions=new_texts,
                 ),
             )
 
             for pname, text in new_texts.items():
-                self.logger.log(f"Iteration {i}: Proposed new text for {pname}", header="propose")
+                self.logger.log(f"Iteration {ctx.iteration}: Proposed new text for {pname}", header="propose")
                 if hasattr(self.logger, "show"):
                     self.logger.show(text, title=f"Proposed: {pname}")
                 else:
                     self.logger.log(text)
         except Exception as e:
-            self.logger.log(f"Iteration {i}: Exception during reflection/proposal: {e}", header="error")
+            self.logger.log(f"Iteration {ctx.iteration}: Exception during reflection/proposal: {e}", header="error")
             import traceback
 
             self.logger.log(traceback.format_exc(), header="error")
             return None
 
-        # 4) Create candidate, evaluate on same minibatch (no need to capture traces)
-        new_candidate = curr_prog.copy()
+        # Create candidate, evaluate on same minibatch (no need to capture traces)
+        new_candidate = ctx.parent_candidate.copy()
         for pname, text in new_texts.items():
             assert pname in new_candidate, f"{pname} missing in candidate"
             new_candidate[pname] = text
@@ -316,34 +174,34 @@ class ReflectiveMutationProposer(ProposeNewCandidate[DataId]):
             self.callbacks,
             "on_evaluation_start",
             EvaluationStartEvent(
-                iteration=i,
+                iteration=ctx.iteration,
                 candidate_idx=None,
-                batch_size=len(minibatch),
+                batch_size=len(ctx.minibatch),
                 capture_traces=False,
-                parent_ids=[curr_prog_id],
-                inputs=minibatch,
+                parent_ids=[ctx.parent_idx],
+                inputs=ctx.minibatch,
                 is_seed_candidate=False,
             ),
         )
 
         outputs_by_id, scores_by_id, objective_by_id, actual_evals_count = state.cached_evaluate_full(
-            new_candidate, subsample_ids, self.trainset.fetch, evaluator
+            new_candidate, ctx.subsample_ids, self.trainset.fetch, evaluator
         )
-        new_scores = [scores_by_id[eid] for eid in subsample_ids]
-        outputs = [outputs_by_id[eid] for eid in subsample_ids]
+        new_scores = [scores_by_id[eid] for eid in ctx.subsample_ids]
+        outputs = [outputs_by_id[eid] for eid in ctx.subsample_ids]
 
         notify_callbacks(
             self.callbacks,
             "on_evaluation_end",
             EvaluationEndEvent(
-                iteration=i,
+                iteration=ctx.iteration,
                 candidate_idx=None,
                 scores=new_scores,
                 has_trajectories=False,
-                parent_ids=[curr_prog_id],
+                parent_ids=[ctx.parent_idx],
                 outputs=outputs,
                 trajectories=None,
-                objective_scores=[objective_by_id[eid] for eid in subsample_ids] if objective_by_id else None,
+                objective_scores=[objective_by_id[eid] for eid in ctx.subsample_ids] if objective_by_id else None,
                 is_seed_candidate=False,
             ),
         )
@@ -357,25 +215,25 @@ class ReflectiveMutationProposer(ProposeNewCandidate[DataId]):
         # Add feedback with subsample scores
         add_call_feedback(
             scores={
-                "mini_batch/before": sum(eval_curr.scores),
+                "mini_batch/before": sum(ctx.parent_eval.scores),
                 "mini_batch/after": new_sum,
             },
         )
 
         return CandidateProposal(
             candidate=new_candidate,
-            parent_program_ids=[curr_prog_id],
-            subsample_indices=subsample_ids,
-            subsample_scores_before=eval_curr.scores,
+            parent_program_ids=[ctx.parent_idx],
+            subsample_indices=ctx.subsample_ids,
+            subsample_scores_before=ctx.parent_eval.scores,
             subsample_scores_after=new_scores,
             tag="reflective_mutation",
             metadata={
-                "iteration_id": i,
-                "subsample_score_before": sum(eval_curr.scores),
+                "iteration_id": ctx.iteration,
+                "subsample_score_before": sum(ctx.parent_eval.scores),
                 "subsample_score_after": new_sum,
-                "accepted": new_sum > sum(eval_curr.scores),
-                "subsample_inputs": list(minibatch),
-                "outputs_before": eval_curr.outputs,
-                "outputs_after": [outputs_by_id[sid] for sid in subsample_ids],
+                "accepted": new_sum > sum(ctx.parent_eval.scores),
+                "subsample_inputs": list(ctx.minibatch),
+                "outputs_before": ctx.parent_eval.outputs,
+                "outputs_after": [outputs_by_id[sid] for sid in ctx.subsample_ids],
             },
         )

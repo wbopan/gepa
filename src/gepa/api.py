@@ -49,10 +49,12 @@ def optimize(
     valset: list[DataInst] | DataLoader[DataId, DataInst] | None = None,
     adapter: GEPAAdapter[DataInst, Trajectory, RolloutOutput] | None = None,
     task_lm: str | ChatCompletionCallable | None = None,
+    task_lm_kwargs: dict | None = None,
     evaluator: Evaluator | None = None,
     # Reflection-based configuration
     reflection_lm: LanguageModel | str | None = None,
-    candidate_selection_strategy: CandidateSelector | Literal["pareto", "current_best", "epsilon_greedy", "avg_family", "max_family"] = "pareto",
+    candidate_selection_strategy: CandidateSelector
+    | Literal["pareto", "current_best", "epsilon_greedy", "avg_family", "max_family"] = "pareto",
     frontier_type: FrontierType = "instance",
     skip_perfect_score: bool = True,
     batch_sampler: BatchSampler | Literal["epoch_shuffled", "adaboost"] = "epoch_shuffled",
@@ -60,6 +62,12 @@ def optimize(
     adaboost_beta: float = 1.0,
     perfect_score: float = 1.0,
     reflection_prompt_template: str | None = None,
+    # Proposer type configuration
+    proposer_type: Literal["reflective_mutation", "feedback_descent"] = "reflective_mutation",
+    # Feedback Descent configuration (only used when proposer_type="feedback_descent")
+    feedback_descent_max_attempts: int = 3,
+    feedback_descent_improvement_threshold: float = 0.0,
+    feedback_lm: LanguageModel | str | None = None,
     # Component selection configuration
     module_selector: ReflectionComponentSelector | str = "round_robin",
     # Merge-based configuration
@@ -129,6 +137,7 @@ def optimize(
     - valset: Validation data source (sequence or `DataLoader`) used for tracking Pareto scores. If not provided, GEPA reuses the trainset.
     - adapter: A `GEPAAdapter` instance that implements the adapter interface. This allows GEPA to plug into your system's environment. If not provided, GEPA will use a default adapter: `gepa.adapters.default_adapter.default_adapter.DefaultAdapter`, with model defined by `task_lm`.
     - task_lm: Optional. The model to use for the task. This is only used if `adapter` is not provided, and is used to initialize the default adapter.
+    - task_lm_kwargs: Optional. Additional kwargs to pass to litellm.batch_completion (e.g., {"max_tokens": 8000}). Only used if `adapter` is not provided.
     - evaluator: Optional. A custom evaluator to use for evaluating the candidate program. If not provided, GEPA will use the default evaluator: `gepa.adapters.default_adapter.default_adapter.ContainsAnswerEvaluator`. Only used if `adapter` is not provided.
 
     # Reflection-based configuration
@@ -140,6 +149,12 @@ def optimize(
     - reflection_minibatch_size: The number of examples to use for reflection in each proposal step. Defaults to 3. Only valid when batch_sampler='epoch_shuffled' (default), and is ignored otherwise.
     - perfect_score: The perfect score to achieve.
     - reflection_prompt_template: The prompt template to use for reflection. If not provided, GEPA will use the default prompt template (see [InstructionProposalSignature](src/gepa/strategies/instruction_proposal.py)). The prompt template must contain the following placeholders, which will be replaced with actual values: `<curr_instructions>` (will be replaced by the instructions to evolve) and `<inputs_outputs_feedback>` (replaced with the inputs, outputs, and feedback generated with current instruction). This will be ignored if the adapter provides its own `propose_new_texts` method.
+
+    # Proposer type configuration
+    - proposer_type: The type of proposer to use. Supported values: 'reflective_mutation' (default) or 'feedback_descent'. The 'feedback_descent' proposer iteratively refines proposals on a mini-batch, accumulating failure feedback until improvement is achieved.
+    - feedback_descent_max_attempts: Maximum number of attempts per iteration when using feedback_descent. Defaults to 3.
+    - feedback_descent_improvement_threshold: Minimum improvement required to accept a proposal in feedback_descent. Defaults to 0.0.
+    - feedback_lm: Optional separate language model for generating feedback analysis. If not provided, uses reflection_lm.
 
     # Component selection configuration
     - module_selector: Component selection strategy. Can be a ReflectionComponentSelector instance or a string ('round_robin', 'all'). Defaults to 'round_robin'. The 'round_robin' strategy cycles through components in order. The 'all' strategy selects all components for modification in every GEPA iteration.
@@ -204,7 +219,8 @@ def optimize(
             "Since no adapter is provided, GEPA requires a task LM to be provided. Please set the `task_lm` parameter."
         )
         active_adapter = cast(
-            GEPAAdapter[DataInst, Trajectory, RolloutOutput], DefaultAdapter(model=task_lm, evaluator=evaluator)
+            GEPAAdapter[DataInst, Trajectory, RolloutOutput],
+            DefaultAdapter(model=task_lm, evaluator=evaluator, litellm_batch_completion_kwargs=task_lm_kwargs),
         )
     else:
         assert task_lm is None, (
@@ -358,20 +374,67 @@ def optimize(
     if cache_evaluation:
         evaluation_cache = EvaluationCache[RolloutOutput, DataId]()
 
-    reflective_proposer = ReflectiveMutationProposer(
-        logger=logger,
-        trainset=train_loader,
-        adapter=active_adapter,
-        candidate_selector=candidate_selector,
-        module_selector=module_selector_instance,
-        batch_sampler=batch_sampler,
-        perfect_score=perfect_score,
-        skip_perfect_score=skip_perfect_score,
-        experiment_tracker=experiment_tracker,
-        reflection_lm=reflection_lm,
-        reflection_prompt_template=reflection_prompt_template,
-        callbacks=callbacks,
-    )
+    # Convert feedback_lm string to callable if needed
+    if isinstance(feedback_lm, str):
+        import litellm
+
+        feedback_lm_name = feedback_lm
+
+        @weave.op(name="gepa.feedback_lm")
+        def _feedback_lm(prompt: str) -> str:
+            completion = litellm.completion(
+                model=feedback_lm_name,
+                messages=[{"role": "user", "content": prompt}],
+                num_retries=5,
+            )
+            return completion.choices[0].message.content  # type: ignore
+
+        feedback_lm = _feedback_lm
+
+    # Create proposer based on proposer_type
+    if proposer_type == "feedback_descent":
+        from gepa.proposer.reflective_mutation.feedback_descent import (
+            FeedbackDescentConfig,
+            FeedbackDescentProposer,
+        )
+
+        if reflection_lm is None:
+            raise ValueError("reflection_lm must be provided when using feedback_descent proposer.")
+
+        reflective_proposer = FeedbackDescentProposer(
+            logger=logger,
+            trainset=train_loader,
+            adapter=active_adapter,
+            candidate_selector=candidate_selector,
+            module_selector=module_selector_instance,
+            batch_sampler=batch_sampler,
+            perfect_score=perfect_score,
+            skip_perfect_score=skip_perfect_score,
+            experiment_tracker=experiment_tracker,
+            reflection_lm=reflection_lm,
+            config=FeedbackDescentConfig(
+                max_attempts=feedback_descent_max_attempts,
+                improvement_threshold=feedback_descent_improvement_threshold,
+            ),
+            feedback_lm=feedback_lm,
+            reflection_prompt_template=reflection_prompt_template,
+            callbacks=callbacks,
+        )
+    else:
+        reflective_proposer = ReflectiveMutationProposer(
+            logger=logger,
+            trainset=train_loader,
+            adapter=active_adapter,
+            candidate_selector=candidate_selector,
+            module_selector=module_selector_instance,
+            batch_sampler=batch_sampler,
+            perfect_score=perfect_score,
+            skip_perfect_score=skip_perfect_score,
+            experiment_tracker=experiment_tracker,
+            reflection_lm=reflection_lm,
+            reflection_prompt_template=reflection_prompt_template,
+            callbacks=callbacks,
+        )
 
     def evaluator_fn(
         inputs: list[DataInst], prog: dict[str, str]

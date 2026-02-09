@@ -1,0 +1,964 @@
+{
+  "pmax": {
+    "run_id": "pmax",
+    "display_name": "pmax",
+    "iterations": 23,
+    "best_score": 0.6666666666666666,
+    "pareto_agg": 0.8333333333333334,
+    "candidate_count": 8,
+    "runtime": 6499,
+    "candidates": [
+      {
+        "idx": 0,
+        "parent_idx": null,
+        "score": 0.4
+      },
+      {
+        "idx": 1,
+        "parent_idx": 0,
+        "score": 0.6
+      },
+      {
+        "idx": 2,
+        "parent_idx": 0,
+        "score": 0.4
+      },
+      {
+        "idx": 3,
+        "parent_idx": 0,
+        "score": 0.1
+      },
+      {
+        "idx": 4,
+        "parent_idx": 2,
+        "score": 0.4666666666666667
+      },
+      {
+        "idx": 5,
+        "parent_idx": 2,
+        "score": 0.4
+      },
+      {
+        "idx": 6,
+        "parent_idx": 0,
+        "score": 0.6666666666666666
+      },
+      {
+        "idx": 7,
+        "parent_idx": 6,
+        "score": 0.6666666666666666
+      }
+    ]
+  },
+  "baseline": {
+    "run_id": "baseline",
+    "display_name": "baseline",
+    "iterations": 94,
+    "best_score": 0.7666666666666667,
+    "pareto_agg": 0.9,
+    "candidate_count": 38,
+    "runtime": 155,
+    "candidates": [
+      {
+        "idx": 0,
+        "parent_idx": null,
+        "score": 0.4
+      },
+      {
+        "idx": 1,
+        "parent_idx": 0,
+        "score": 0.5333333333333333
+      },
+      {
+        "idx": 2,
+        "parent_idx": 1,
+        "score": 0.26666666666666666
+      },
+      {
+        "idx": 3,
+        "parent_idx": 1,
+        "score": 0.4
+      },
+      {
+        "idx": 4,
+        "parent_idx": 1,
+        "score": 0.3333333333333333
+      },
+      {
+        "idx": 5,
+        "parent_idx": 3,
+        "score": 0.4
+      },
+      {
+        "idx": 6,
+        "parent_idx": 1,
+        "score": 0.03333333333333333
+      },
+      {
+        "idx": 7,
+        "parent_idx": 1,
+        "score": 0.16666666666666666
+      },
+      {
+        "idx": 8,
+        "parent_idx": 3,
+        "score": 0.1
+      },
+      {
+        "idx": 9,
+        "parent_idx": 5,
+        "score": 0.36666666666666664
+      },
+      {
+        "idx": 10,
+        "parent_idx": 5,
+        "score": 0.36666666666666664
+      },
+      {
+        "idx": 11,
+        "parent_idx": 3,
+        "score": 0.5333333333333333
+      },
+      {
+        "idx": 12,
+        "parent_idx": 3,
+        "score": 0.26666666666666666
+      },
+      {
+        "idx": 13,
+        "parent_idx": 0,
+        "score": 0.5666666666666667
+      },
+      {
+        "idx": 14,
+        "parent_idx": 11,
+        "score": 0.4
+      },
+      {
+        "idx": 15,
+        "parent_idx": 13,
+        "score": 0.7
+      },
+      {
+        "idx": 16,
+        "parent_idx": 15,
+        "score": 0.6333333333333333
+      },
+      {
+        "idx": 17,
+        "parent_idx": 16,
+        "score": 0.7666666666666667
+      },
+      {
+        "idx": 18,
+        "parent_idx": 17,
+        "score": 0.7
+      },
+      {
+        "idx": 19,
+        "parent_idx": 17,
+        "score": 0.6
+      },
+      {
+        "idx": 20,
+        "parent_idx": 17,
+        "score": 0.6666666666666666
+      },
+      {
+        "idx": 21,
+        "parent_idx": 17,
+        "score": 0.6333333333333333
+      },
+      {
+        "idx": 22,
+        "parent_idx": 17,
+        "score": 0.7333333333333333
+      },
+      {
+        "idx": 23,
+        "parent_idx": 17,
+        "score": 0.6333333333333333
+      },
+      {
+        "idx": 24,
+        "parent_idx": 17,
+        "score": 0.5666666666666667
+      },
+      {
+        "idx": 25,
+        "parent_idx": 17,
+        "score": 0.6
+      },
+      {
+        "idx": 26,
+        "parent_idx": 14,
+        "score": 0.43333333333333335
+      },
+      {
+        "idx": 27,
+        "parent_idx": 17,
+        "score": 0.7
+      },
+      {
+        "idx": 28,
+        "parent_idx": 14,
+        "score": 0.5333333333333333
+      },
+      {
+        "idx": 29,
+        "parent_idx": 15,
+        "score": 0.4666666666666667
+      },
+      {
+        "idx": 30,
+        "parent_idx": 15,
+        "score": 0.5333333333333333
+      },
+      {
+        "idx": 31,
+        "parent_idx": 15,
+        "score": 0.6
+      },
+      {
+        "idx": 32,
+        "parent_idx": 17,
+        "score": 0.6333333333333333
+      },
+      {
+        "idx": 33,
+        "parent_idx": 17,
+        "score": 0.6666666666666666
+      },
+      {
+        "idx": 34,
+        "parent_idx": 27,
+        "score": 0.6
+      },
+      {
+        "idx": 35,
+        "parent_idx": 27,
+        "score": 0.6333333333333333
+      },
+      {
+        "idx": 36,
+        "parent_idx": 17,
+        "score": 0.7333333333333333
+      },
+      {
+        "idx": 37,
+        "parent_idx": 15,
+        "score": 0.4666666666666667
+      }
+    ]
+  },
+  "bayesian": {
+    "run_id": "bayesian",
+    "display_name": "bayesian",
+    "iterations": 124,
+    "best_score": 0.7666666666666667,
+    "pareto_agg": 0.9666666666666668,
+    "candidate_count": 30,
+    "runtime": 215,
+    "candidates": [
+      {
+        "idx": 0,
+        "parent_idx": null,
+        "score": 0.4
+      },
+      {
+        "idx": 1,
+        "parent_idx": 0,
+        "score": 0.36666666666666664
+      },
+      {
+        "idx": 2,
+        "parent_idx": 1,
+        "score": 0.5666666666666667
+      },
+      {
+        "idx": 3,
+        "parent_idx": 2,
+        "score": 0.43333333333333335
+      },
+      {
+        "idx": 4,
+        "parent_idx": 2,
+        "score": 0.5333333333333333
+      },
+      {
+        "idx": 5,
+        "parent_idx": 3,
+        "score": 0.5666666666666667
+      },
+      {
+        "idx": 6,
+        "parent_idx": 2,
+        "score": 0.43333333333333335
+      },
+      {
+        "idx": 7,
+        "parent_idx": 5,
+        "score": 0.6333333333333333
+      },
+      {
+        "idx": 8,
+        "parent_idx": 5,
+        "score": 0.6666666666666666
+      },
+      {
+        "idx": 9,
+        "parent_idx": 2,
+        "score": 0.43333333333333335
+      },
+      {
+        "idx": 10,
+        "parent_idx": 7,
+        "score": 0.6
+      },
+      {
+        "idx": 11,
+        "parent_idx": 7,
+        "score": 0.7666666666666667
+      },
+      {
+        "idx": 12,
+        "parent_idx": 2,
+        "score": 0.43333333333333335
+      },
+      {
+        "idx": 13,
+        "parent_idx": 11,
+        "score": 0.6
+      },
+      {
+        "idx": 14,
+        "parent_idx": 2,
+        "score": 0.6
+      },
+      {
+        "idx": 15,
+        "parent_idx": 11,
+        "score": 0.5
+      },
+      {
+        "idx": 16,
+        "parent_idx": 8,
+        "score": 0.6666666666666666
+      },
+      {
+        "idx": 17,
+        "parent_idx": 16,
+        "score": 0.6
+      },
+      {
+        "idx": 18,
+        "parent_idx": 11,
+        "score": 0.6333333333333333
+      },
+      {
+        "idx": 19,
+        "parent_idx": 11,
+        "score": 0.5666666666666667
+      },
+      {
+        "idx": 20,
+        "parent_idx": 11,
+        "score": 0.6666666666666666
+      },
+      {
+        "idx": 21,
+        "parent_idx": 11,
+        "score": 0.6333333333333333
+      },
+      {
+        "idx": 22,
+        "parent_idx": 2,
+        "score": 0.5
+      },
+      {
+        "idx": 23,
+        "parent_idx": 2,
+        "score": 0.4666666666666667
+      },
+      {
+        "idx": 24,
+        "parent_idx": 20,
+        "score": 0.5333333333333333
+      },
+      {
+        "idx": 25,
+        "parent_idx": 11,
+        "score": 0.6
+      },
+      {
+        "idx": 26,
+        "parent_idx": 22,
+        "score": 0.5666666666666667
+      },
+      {
+        "idx": 27,
+        "parent_idx": 16,
+        "score": 0.6333333333333333
+      },
+      {
+        "idx": 28,
+        "parent_idx": 16,
+        "score": 0.7
+      },
+      {
+        "idx": 29,
+        "parent_idx": 2,
+        "score": 0.3333333333333333
+      }
+    ]
+  },
+  "adaboost": {
+    "run_id": "adaboost",
+    "display_name": "adaboost",
+    "iterations": 92,
+    "best_score": 0.8,
+    "pareto_agg": 0.9333333333333332,
+    "candidate_count": 37,
+    "runtime": 185,
+    "candidates": [
+      {
+        "idx": 0,
+        "parent_idx": null,
+        "score": 0.4
+      },
+      {
+        "idx": 1,
+        "parent_idx": 0,
+        "score": 0.5333333333333333
+      },
+      {
+        "idx": 2,
+        "parent_idx": 0,
+        "score": 0.13333333333333333
+      },
+      {
+        "idx": 3,
+        "parent_idx": 0,
+        "score": 0.7
+      },
+      {
+        "idx": 4,
+        "parent_idx": 3,
+        "score": 0.5
+      },
+      {
+        "idx": 5,
+        "parent_idx": 3,
+        "score": 0.8
+      },
+      {
+        "idx": 6,
+        "parent_idx": 5,
+        "score": 0.6333333333333333
+      },
+      {
+        "idx": 7,
+        "parent_idx": 5,
+        "score": 0.4
+      },
+      {
+        "idx": 8,
+        "parent_idx": 5,
+        "score": 0.6666666666666666
+      },
+      {
+        "idx": 9,
+        "parent_idx": 5,
+        "score": 0.7
+      },
+      {
+        "idx": 10,
+        "parent_idx": 5,
+        "score": 0.7
+      },
+      {
+        "idx": 11,
+        "parent_idx": 5,
+        "score": 0.6333333333333333
+      },
+      {
+        "idx": 12,
+        "parent_idx": 5,
+        "score": 0.6333333333333333
+      },
+      {
+        "idx": 13,
+        "parent_idx": 5,
+        "score": 0.6
+      },
+      {
+        "idx": 14,
+        "parent_idx": 5,
+        "score": 0.7
+      },
+      {
+        "idx": 15,
+        "parent_idx": 5,
+        "score": 0.6
+      },
+      {
+        "idx": 16,
+        "parent_idx": 15,
+        "score": 0.7333333333333333
+      },
+      {
+        "idx": 17,
+        "parent_idx": 5,
+        "score": 0.6333333333333333
+      },
+      {
+        "idx": 18,
+        "parent_idx": 17,
+        "score": 0.6666666666666666
+      },
+      {
+        "idx": 19,
+        "parent_idx": 5,
+        "score": 0.7
+      },
+      {
+        "idx": 20,
+        "parent_idx": 5,
+        "score": 0.6333333333333333
+      },
+      {
+        "idx": 21,
+        "parent_idx": 17,
+        "score": 0.7333333333333333
+      },
+      {
+        "idx": 22,
+        "parent_idx": 16,
+        "score": 0.7
+      },
+      {
+        "idx": 23,
+        "parent_idx": 5,
+        "score": 0.7333333333333333
+      },
+      {
+        "idx": 24,
+        "parent_idx": 5,
+        "score": 0.6333333333333333
+      },
+      {
+        "idx": 25,
+        "parent_idx": 5,
+        "score": 0.6333333333333333
+      },
+      {
+        "idx": 26,
+        "parent_idx": 21,
+        "score": 0.6666666666666666
+      },
+      {
+        "idx": 27,
+        "parent_idx": 5,
+        "score": 0.7333333333333333
+      },
+      {
+        "idx": 28,
+        "parent_idx": 5,
+        "score": 0.7333333333333333
+      },
+      {
+        "idx": 29,
+        "parent_idx": 28,
+        "score": 0.6333333333333333
+      },
+      {
+        "idx": 30,
+        "parent_idx": 29,
+        "score": 0.7333333333333333
+      },
+      {
+        "idx": 31,
+        "parent_idx": 18,
+        "score": 0.6666666666666666
+      },
+      {
+        "idx": 32,
+        "parent_idx": 29,
+        "score": 0.7
+      },
+      {
+        "idx": 33,
+        "parent_idx": 28,
+        "score": 0.3333333333333333
+      },
+      {
+        "idx": 34,
+        "parent_idx": 28,
+        "score": 0.3333333333333333
+      },
+      {
+        "idx": 35,
+        "parent_idx": 29,
+        "score": 0.7
+      },
+      {
+        "idx": 36,
+        "parent_idx": 29,
+        "score": 0.7
+      }
+    ]
+  },
+  "adaboost-avg": {
+    "run_id": "adaboost-avg",
+    "display_name": "adaboost-avg",
+    "iterations": 45,
+    "best_score": 0.5333333333333333,
+    "pareto_agg": 0.8,
+    "candidate_count": 15,
+    "runtime": 11681,
+    "candidates": [
+      {
+        "idx": 0,
+        "parent_idx": null,
+        "score": 0.4
+      },
+      {
+        "idx": 1,
+        "parent_idx": 0,
+        "score": 0.5333333333333333
+      },
+      {
+        "idx": 2,
+        "parent_idx": 1,
+        "score": 0.4666666666666667
+      },
+      {
+        "idx": 3,
+        "parent_idx": 1,
+        "score": 0.4666666666666667
+      },
+      {
+        "idx": 4,
+        "parent_idx": 1,
+        "score": 0.06666666666666667
+      },
+      {
+        "idx": 5,
+        "parent_idx": 0,
+        "score": 0.3333333333333333
+      },
+      {
+        "idx": 6,
+        "parent_idx": 2,
+        "score": 0.3
+      },
+      {
+        "idx": 7,
+        "parent_idx": 3,
+        "score": 0.4
+      },
+      {
+        "idx": 8,
+        "parent_idx": 3,
+        "score": 0.4666666666666667
+      },
+      {
+        "idx": 9,
+        "parent_idx": 8,
+        "score": 0.26666666666666666
+      },
+      {
+        "idx": 10,
+        "parent_idx": 3,
+        "score": 0.36666666666666664
+      },
+      {
+        "idx": 11,
+        "parent_idx": 3,
+        "score": 0.4666666666666667
+      },
+      {
+        "idx": 12,
+        "parent_idx": 11,
+        "score": 0.23333333333333334
+      },
+      {
+        "idx": 13,
+        "parent_idx": 3,
+        "score": 0.4
+      },
+      {
+        "idx": 14,
+        "parent_idx": 3,
+        "score": 0.2
+      }
+    ]
+  },
+  "adaboost-max": {
+    "run_id": "adaboost-max",
+    "display_name": "adaboost-max",
+    "iterations": 25,
+    "best_score": 0.7333333333333333,
+    "pareto_agg": 0.8666666666666667,
+    "candidate_count": 13,
+    "runtime": 4066,
+    "candidates": [
+      {
+        "idx": 0,
+        "parent_idx": null,
+        "score": 0.4
+      },
+      {
+        "idx": 1,
+        "parent_idx": 0,
+        "score": 0.5333333333333333
+      },
+      {
+        "idx": 2,
+        "parent_idx": 0,
+        "score": 0.13333333333333333
+      },
+      {
+        "idx": 3,
+        "parent_idx": 0,
+        "score": 0.5333333333333333
+      },
+      {
+        "idx": 4,
+        "parent_idx": 3,
+        "score": 0.5333333333333333
+      },
+      {
+        "idx": 5,
+        "parent_idx": 0,
+        "score": 0.7
+      },
+      {
+        "idx": 6,
+        "parent_idx": 0,
+        "score": 0.13333333333333333
+      },
+      {
+        "idx": 7,
+        "parent_idx": 0,
+        "score": 0.5333333333333333
+      },
+      {
+        "idx": 8,
+        "parent_idx": 5,
+        "score": 0.6333333333333333
+      },
+      {
+        "idx": 9,
+        "parent_idx": 5,
+        "score": 0.7333333333333333
+      },
+      {
+        "idx": 10,
+        "parent_idx": 3,
+        "score": 0.6
+      },
+      {
+        "idx": 11,
+        "parent_idx": 0,
+        "score": 0.13333333333333333
+      },
+      {
+        "idx": 12,
+        "parent_idx": 0,
+        "score": 0.3333333333333333
+      }
+    ]
+  },
+  "adaboost-max3": {
+    "run_id": "adaboost-max3",
+    "display_name": "adaboost-max3",
+    "iterations": 91,
+    "best_score": 0.6333333333333333,
+    "pareto_agg": 0.9333333333333332,
+    "candidate_count": 36,
+    "runtime": 35584,
+    "candidates": [
+      {
+        "idx": 0,
+        "parent_idx": null,
+        "score": 0.4
+      },
+      {
+        "idx": 1,
+        "parent_idx": 0,
+        "score": 0.5333333333333333
+      },
+      {
+        "idx": 2,
+        "parent_idx": 0,
+        "score": 0.13333333333333333
+      },
+      {
+        "idx": 3,
+        "parent_idx": 0,
+        "score": 0.13333333333333333
+      },
+      {
+        "idx": 4,
+        "parent_idx": 0,
+        "score": 0.06666666666666667
+      },
+      {
+        "idx": 5,
+        "parent_idx": 1,
+        "score": 0.5333333333333333
+      },
+      {
+        "idx": 6,
+        "parent_idx": 1,
+        "score": 0.5333333333333333
+      },
+      {
+        "idx": 7,
+        "parent_idx": 0,
+        "score": 0.6333333333333333
+      },
+      {
+        "idx": 8,
+        "parent_idx": 5,
+        "score": 0.5333333333333333
+      },
+      {
+        "idx": 9,
+        "parent_idx": 0,
+        "score": 0.6
+      },
+      {
+        "idx": 10,
+        "parent_idx": 7,
+        "score": 0.6333333333333333
+      },
+      {
+        "idx": 11,
+        "parent_idx": 1,
+        "score": 0.3
+      },
+      {
+        "idx": 12,
+        "parent_idx": 5,
+        "score": 0.4666666666666667
+      },
+      {
+        "idx": 13,
+        "parent_idx": 9,
+        "score": 0.6
+      },
+      {
+        "idx": 14,
+        "parent_idx": 10,
+        "score": 0.5
+      },
+      {
+        "idx": 15,
+        "parent_idx": 6,
+        "score": 0.6
+      },
+      {
+        "idx": 16,
+        "parent_idx": 9,
+        "score": 0.5333333333333333
+      },
+      {
+        "idx": 17,
+        "parent_idx": 1,
+        "score": 0.2
+      },
+      {
+        "idx": 18,
+        "parent_idx": 0,
+        "score": 0.16666666666666666
+      },
+      {
+        "idx": 19,
+        "parent_idx": 10,
+        "score": 0.5333333333333333
+      },
+      {
+        "idx": 20,
+        "parent_idx": 14,
+        "score": 0.6
+      },
+      {
+        "idx": 21,
+        "parent_idx": 0,
+        "score": 0.4
+      },
+      {
+        "idx": 22,
+        "parent_idx": 1,
+        "score": 0.43333333333333335
+      },
+      {
+        "idx": 23,
+        "parent_idx": 5,
+        "score": 0.5
+      },
+      {
+        "idx": 24,
+        "parent_idx": 8,
+        "score": 0.5666666666666667
+      },
+      {
+        "idx": 25,
+        "parent_idx": 0,
+        "score": 0.43333333333333335
+      },
+      {
+        "idx": 26,
+        "parent_idx": 10,
+        "score": 0.5
+      },
+      {
+        "idx": 27,
+        "parent_idx": 14,
+        "score": 0.4666666666666667
+      },
+      {
+        "idx": 28,
+        "parent_idx": 13,
+        "score": 0.16666666666666666
+      },
+      {
+        "idx": 29,
+        "parent_idx": 1,
+        "score": 0.5333333333333333
+      },
+      {
+        "idx": 30,
+        "parent_idx": 7,
+        "score": 0.5333333333333333
+      },
+      {
+        "idx": 31,
+        "parent_idx": 24,
+        "score": 0.36666666666666664
+      },
+      {
+        "idx": 32,
+        "parent_idx": 12,
+        "score": 0.3333333333333333
+      },
+      {
+        "idx": 33,
+        "parent_idx": 14,
+        "score": 0.5666666666666667
+      },
+      {
+        "idx": 34,
+        "parent_idx": 23,
+        "score": 0.4666666666666667
+      },
+      {
+        "idx": 35,
+        "parent_idx": 7,
+        "score": 0.6
+      }
+    ]
+  }
+}

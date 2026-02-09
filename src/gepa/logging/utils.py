@@ -128,9 +128,10 @@ def log_detailed_metrics_after_discovering_new_program(
         "pareto/val_candidates": {k: list(v) for k, v in gepa_state.program_at_pareto_front_valset.items()},
         "pareto/linear_best_idx": linear_pareto_front_program_idx,
         "val/eval_count": coverage,
-        "val/total": valset_size,
         "val/new_score": valset_score,
     }
+    # Log valset_size to summary (constant per run, not useful as time-series)
+    experiment_tracker.log_summary({"val/total": valset_size})
     if log_individual_valset_scores_and_programs:
         metrics.update(
             {

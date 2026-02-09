@@ -41,7 +41,7 @@ def init_dataset():
 
         # Find the correct answer letter after shuffling
         correct_answer = x["Correct Answer"]
-        correct_letter = r"\box{" + ["A", "B", "C", "D"][answers.index(correct_answer)] + "}"
+        correct_letter = r"\boxed{" + ["A", "B", "C", "D"][answers.index(correct_answer)] + "}"
 
         # Format choices with proper A, B, C, D labels
         choices = [f"{letter}) {ans}" for letter, ans in zip(["A", "B", "C", "D"], answers, strict=True)]

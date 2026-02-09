@@ -27,15 +27,16 @@ def main() -> None:
                 "You are an expert scientist answering graduate-level "
                 "multiple-choice questions in physics, chemistry, and biology. "
                 "Analyze each question carefully, reason through the problem "
-                r"step by step, then provide your final answer in the format \box{N} "
-                r"where N is the letter (A, B, C, or D). For example: \box{A}"
+                r"step by step, then provide your final answer in the format \boxed{N} "
+                r"where N is the letter (A, B, C, or D). For example: \boxed{A}"
             )
         },
         trainset=trainset,
         valset=valset,
-        task_lm="openrouter/openai/gpt-4o-mini",
+        task_lm="openrouter/openai/gpt-5-mini",
+        task_lm_kwargs={"max_tokens": 8000},
         reflection_lm="openrouter/openai/gpt-4o-mini",
-        max_metric_calls=3,  # Only run initial valset eval (3 examples) for cache testing
+        max_metric_calls=1000,
         reflection_minibatch_size=3,
         display_progress_bar=True,
         seed=42,

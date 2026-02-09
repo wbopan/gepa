@@ -211,6 +211,11 @@ gepa_terminus/
 mlruns/
 wandb/
 
+# Ad-hoc analysis outputs
+analysis_output/
+slides_export/
+_sesh
+
 # Git worktrees
 worktrees/
 artifacts/

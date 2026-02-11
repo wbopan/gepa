@@ -176,7 +176,3 @@ jobs:
         run: uv pip install dist/*.whl -p .venv
       - name: Test import gepa
         run: uv run -p .venv python -c "import gepa"
-      # Ensure gepa[dspy] does not bring in new packages
-      - name: Install dependencies
-        run: |
-          uv run --isolated --extra dspy python tests/ensure_gepa_dspy_dependency.py

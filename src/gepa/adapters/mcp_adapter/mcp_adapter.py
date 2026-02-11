@@ -537,13 +537,13 @@ Always respond with valid JSON. No other text.
         - ImageContent: Image data (converted to description)
         - structuredContent: Structured JSON data
 
-        Based on latest MCP SDK examples and DSPy implementation.
+        Based on latest MCP SDK examples.
         """
         try:
             # Import MCP types for proper parsing
             from mcp.types import EmbeddedResource, ImageContent, TextContent  # type: ignore[import-untyped]
 
-            # Check for errors first (following DSPy pattern)
+            # Check for errors first
             if hasattr(result, "isError") and result.isError:
                 # Extract error message from content
                 error_texts = []

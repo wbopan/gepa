@@ -176,7 +176,7 @@ def optimize(
     - weave_project_name: The project name to use for wandb weave. Defaults to 'gepa-boost'.
     - track_best_outputs: Whether to track the best outputs on the validation set. If True, GEPAResult will contain the best outputs obtained for each task in the validation set.
     - display_progress_bar: Show a tqdm progress bar over metric calls when enabled.
-    - use_cloudpickle: Use cloudpickle instead of pickle. This can be helpful when the serialized state contains dynamically generated DSPy signatures.
+    - use_cloudpickle: Use cloudpickle instead of pickle. This can be helpful when the serialized state contains dynamically generated objects.
 
     # Evaluation caching
     - cache_evaluation: Whether to cache the (score, output, objective_scores) of (candidate, example) pairs. If True and a cache entry exists, GEPA will skip the fitness evaluation and use the cached results. This helps avoid redundant evaluations and saves metric calls. Defaults to False.

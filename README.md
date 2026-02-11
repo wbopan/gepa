@@ -33,12 +33,8 @@ pip install git+https://github.com/gepa-ai/gepa.git
 
 ## Using GEPA
 
-### The Easiest Path: DSPy Integration
-
-> **The easiest and most powerful way to use GEPA for prompt optimization is within [DSPy](https://dspy.ai/), where the GEPA algorithm is directly available through the `dspy.GEPA` API. Directly executable tutorial notebooks are at [dspy.GEPA Tutorials](https://dspy.ai/tutorials/gepa_ai_program/).**
-
 ### Simple Prompt Optimization Example
-GEPA can be run in just a few lines of code. In this example, we'll use GEPA to optimize a system prompt for math problems from the AIME benchmark ([full tutorial](https://dspy.ai/tutorials/gepa_aime/)). Run the following in an environment with `OPENAI_API_KEY`:
+GEPA can be run in just a few lines of code. In this example, we'll use GEPA to optimize a system prompt for math problems from the AIME benchmark. Run the following in an environment with `OPENAI_API_KEY`:
 ```python
 import gepa
 
@@ -224,9 +220,7 @@ Finally:
 
 <br/>
 
-GEPA is built around a flexible [GEPAAdapter](src/gepa/core/adapter.py) abstraction that lets it plug into any system and optimize different types of text snippets. The above example used a simple [`DefaultAdapter`](src/gepa/adapters/default_adapter/default_adapter.py) that plugs into a single-turn LLM environment and evolves system prompts, where tasks are presented as user messages. GEPA can be easily extended to multi-turn and other agentic settings. For example, the `dspy.GEPA` integration uses a [DSPyAdapter](https://github.com/stanfordnlp/dspy/blob/main/dspy/teleprompt/gepa/gepa_utils.py#L51).
-
-Beyond prompt optimization, GEPA can evolve entire programs. The [`DSPy Full Program Adapter`](src/gepa/adapters/dspy_full_program_adapter/) demonstrates this by evolving complete DSPy programs—including custom signatures, modules, and control flow logic. Starting from a basic `dspy.ChainOfThought("question -> answer")` that achieves 67% on the MATH benchmark, GEPA evolves a multi-step reasoning program that reach **93% accuracy**. A [fully executable example notebook](src/gepa/examples/dspy_full_program_evolution/example.ipynb) shows how to use this adapter.
+GEPA is built around a flexible [GEPAAdapter](src/gepa/core/adapter.py) abstraction that lets it plug into any system and optimize different types of text snippets. The above example used a simple [`DefaultAdapter`](src/gepa/adapters/default_adapter/default_adapter.py) that plugs into a single-turn LLM environment and evolves system prompts, where tasks are presented as user messages. GEPA can be easily extended to multi-turn and other agentic settings.
 
 ### Using GEPA to optimize _your_ system
 
@@ -264,7 +258,7 @@ GEPA optimizes text components of systems using an evolutionary search algorithm
 
 ## Contributions
 
-We encourage the community and users to help us develop adapters to allow GEPA to be used for optimizing all kinds of systems leveraging textual components. Refer to [DSPy/GEPAAdapter](https://github.com/stanfordnlp/dspy/tree/main/dspy/teleprompt/gepa/gepa_utils.py) and [src/gepa/adapters/](src/gepa/adapters/) for example `GEPAAdapter` implementations. Please feel free to flag any problems faced as issues.
+We encourage the community and users to help us develop adapters to allow GEPA to be used for optimizing all kinds of systems leveraging textual components. Refer to [src/gepa/adapters/](src/gepa/adapters/) for example `GEPAAdapter` implementations. Please feel free to flag any problems faced as issues.
 
 **If you'd like to list yourself as a user, or highlight your usecase for GEPA, please reach out to [lakshyaaagrawal@berkeley.edu](mailto:lakshyaaagrawal@berkeley.edu).**
 
@@ -273,12 +267,9 @@ We encourage the community and users to help us develop adapters to allow GEPA t
 - **Paper:** 📄 [GEPA: Reflective Prompt Evolution Can Outperform Reinforcement Learning (arXiv:2507.19457)](https://arxiv.org/abs/2507.19457)
 - **Experiment reproduction artifact:** [GEPA Artifact Repository](https://github.com/gepa-ai/gepa-artifact)
 - **Talk Slides**: [GEPA Talk Slides](https://docs.google.com/presentation/d/1vIauqn55WfdgJjwU0IDjvaqpv1QHhvhPaLAKdrCFAEg/edit?usp=sharing)
-- **Tutorials & Examples:**  
-  - [dspy.GEPA Tutorials, with executable notebooks](https://dspy.ai/tutorials/gepa_ai_program/)  
-    Step-by-step notebooks showing how to use GEPA for practical optimization tasks via DSPy, including math, structured data extraction for enterprise tasks and privacy conscious delegation task.
-  - [Video tutorial by @weaviate on using dspy.GEPA to optimize a listwise reranker](https://www.youtube.com/watch?v=H4o7h6ZbA4o)
-  - [Matei Zaharia - Reflective Optimization of Agents with GEPA and DSPy](https://www.youtube.com/watch?v=rrtxyZ4Vnv8)
-  - [Building and optimizing a multi-agent system for healthcare domain using DSPy+GEPA](https://kargarisaac.medium.com/building-and-optimizing-multi-agent-rag-systems-with-dspy-and-gepa-2b88b5838ce2)
+- **Tutorials & Examples:**
+  - [Video tutorial by @weaviate on using GEPA to optimize a listwise reranker](https://www.youtube.com/watch?v=H4o7h6ZbA4o)
+  - [Building and optimizing a multi-agent system for healthcare domain using GEPA](https://kargarisaac.medium.com/building-and-optimizing-multi-agent-rag-systems-with-dspy-and-gepa-2b88b5838ce2)
 - **Social and Discussion:**  
   - [X (formerly Twitter) Announcement Thread (Lakshya A Agrawal)](https://x.com/LakshyAAAgrawal/status/1949867947867984322)
   - [GEPA covered by VentureBeat](https://venturebeat.com/ai/gepa-optimizes-llms-without-costly-reinforcement-learning)
@@ -289,13 +280,11 @@ We encourage the community and users to help us develop adapters to allow GEPA t
   - Questions, Discussions?
     - [Join our Discord for active discussion](https://discord.gg/A7dABbtmFw)
     - [Open a GitHub issue](https://github.com/gepa-ai/gepa/issues)
-- **GEPA Integrations:**  
-  Want to use GEPA in other frameworks?  
-  - [DSPy Adapter Code](https://github.com/stanfordnlp/dspy/tree/main/dspy/teleprompt/gepa/gepa_utils.py) (integrates GEPA with [DSPy](https://dspy.ai/)),  
+- **GEPA Integrations:**
+  Want to use GEPA in other frameworks?
   - [MLflow Prompt Optimization](https://mlflow.org/docs/latest/genai/prompt-registry/optimize-prompts/) - GEPA is integrated into MLflow's `mlflow.genai.optimize_prompts()` API for automatic prompt improvement using evaluation metrics and training data. Works with any agent framework and supports multi-prompt optimization.
   - [Contributed Adapters](src/gepa/adapters/) – see our adapter templates and issue tracker to request new integrations.
     - [DefaultAdapter](src/gepa/adapters/default_adapter/) - System Prompt Optimization for a single-turn task.
-    - [DSPy Full Program Adapter](src/gepa/adapters/dspy_full_program_adapter/) - Evolves entire DSPy programs including signatures, modules, and control flow. Achieves **93% accuracy** on MATH benchmark (vs 67% with basic DSPy ChainOfThought).
     - [Generic RAG Adapter](src/gepa/adapters/generic_rag_adapter/) - Vector store-agnostic RAG optimization supporting ChromaDB, Weaviate, Qdrant, Pinecone, and more. Optimizes query reformulation, context synthesis, answer generation, and document reranking prompts.
     - [MCP Adapter](src/gepa/adapters/mcp_adapter/) - Optimize [Model Context Protocol (MCP)](https://modelcontextprotocol.io/) tool usage. Supports local stdio servers, remote SSE/HTTP servers, and optimizes tool descriptions and system prompts.
     - [TerminalBench Adapter](src/gepa/adapters/terminal_bench_adapter/) - Easily integrating GEPA into a Terminus, a sophisticated external agentic pipeline, and optimizing the agents' system prompt.
@@ -304,8 +293,6 @@ We encourage the community and users to help us develop adapters to allow GEPA t
     - [Context Compression using GEPA](https://github.com/Laurian/context-compression-experiments-2508)
     - [GEPA Integration into SuperOptiX-AI](https://github.com/SuperagenticAI/gepa-eval)
     - [GEPA for Observable Javascript](https://observablehq.com/@tomlarkworthy/gepa)
-    - [bandit_dspy](https://github.com/evalops/bandit_dspy)
-    - [GEPA in Go Programming Language](https://github.com/XiaoConstantine/dspy-go)
     - [100% accuracy using GEPA on the clock-hands problem](https://colab.research.google.com/drive/1W-XNxKL2CXFoUTwrL7GLCZ7J7uZgXsut?usp=sharing)
     - [Prompt Optimization for Reliable Backdoor Detection in AI-Generated Code](https://www.lesswrong.com/posts/bALBxf3yGGx4bvvem/prompt-optimization-can-enable-ai-control-research)
     - [Teaching LLMs to Diagnose Production Incidents with ATLAS+GEPA](https://www.arc.computer/blog/atlas-sre-diagnosis)
@@ -320,7 +307,6 @@ We encourage the community and users to help us develop adapters to allow GEPA t
     - Boosting Sanskrit QA: Finetuning EmbeddingGemma with 50k GEPA generated synthetic data samples [(Tweet)](https://x.com/dhrtha/status/1984315872547385504), [(Code)](https://github.com/ganarajpr/rgfe)
     - [Simulating Realistic Market Research Focus Groups with GEPA-Optimized AI Personas](https://x.com/hammer_mt/status/1984269888979116061)
     - [Optimizing Google ADK Agents' SOP using GEPA](https://raphaelmansuy.github.io/adk_training/blog/gepa-optimization-tutorial/)
-    - [HuggingFace Cookbook on prompt optimization for with DSPy and GEPA](https://huggingface.co/learn/cookbook/en/dspy_gepa)
     - [OpenAI Cookbook showing how to build self-evolving agents using GEPA](https://cookbook.openai.com/examples/partners/self_evolving_agents/autonomous_agent_retraining)
 
 ## Reference and Citation

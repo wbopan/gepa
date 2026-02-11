@@ -41,7 +41,6 @@ full = [
     # Common dependencies
     "tqdm>=4.66.1"
 ]
-dspy = []
 test = [
     "gepa[full]",
     "pytest",

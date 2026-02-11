@@ -334,7 +334,6 @@ class GEPAAdapter(Protocol[DataInst, Trajectory, RolloutOutput]):
 
 **Pre-built Adapters:**
 - `DefaultAdapter`: Single-turn LLM system prompt optimization
-- `DSPyAdapter`: DSPy module integration
 - `GenericRAGAdapter`: RAG system optimization
 - `MCPAdapter`: Model Context Protocol tools
 - `TerminalBenchAdapter`: Terminal-use agents

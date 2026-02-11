@@ -46,7 +46,7 @@ class ProposalFn(Protocol):
           `GEPAAdapter.make_reflective_dataset`), and a list of component names to update,
           return a mapping component_name -> new component text (str). This allows the user
           to implement their own instruction proposal logic. For example, the user can use
-          a different LLM, implement DSPy signatures, etc. Another example can be situations
+          a different LLM, implement custom signatures, etc. Another example can be situations
           where 2 or more components need to be updated together (coupled updates).
 
         Returns

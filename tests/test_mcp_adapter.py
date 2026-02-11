@@ -315,7 +315,7 @@ class TestMCPAdapterHelpers:
         assert extracted == ""
 
     def test_extract_tool_response_with_error(self, server_params, simple_metric):
-        """Test extracting error from tool response (DSPy pattern)."""
+        """Test extracting error from tool response."""
         from mcp.types import CallToolResult, TextContent
 
         adapter = MCPAdapter(

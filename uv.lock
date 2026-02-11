@@ -940,7 +940,7 @@ requires-dist = [
     { name = "weave", extras = ["litellm"], specifier = ">=0.51.0" },
     { name = "wheel", marker = "extra == 'build'" },
 ]
-provides-extras = ["full", "dspy", "test", "build", "dev"]
+provides-extras = ["full", "test", "build", "dev"]
 
 [[package]]
 name = "gitdb"

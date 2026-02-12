@@ -2,13 +2,13 @@
 # https://github.com/gepa-ai/gepa
 
 import json
-import math
+import random
 import re
-from typing import Any, Optional
+from typing import Any
 
 
 def init_dataset(
-    categories: Optional[list[str]] = None,
+    categories: list[str] | None = None,
 ) -> tuple[list[dict[str, Any]], list[dict[str, Any]], list[dict[str, Any]]]:
     """
     Load BFCL v3 dataset for function-calling evaluation.
@@ -94,9 +94,13 @@ def init_dataset(
                         "category": category,
                         "id": qid,
                         "ground_truth_raw": json.dumps(raw_ground_truth),
+                        "function_schemas": json.dumps(function_schemas),
                     },
                 }
             )
+
+    # Shuffle deterministically before splitting to ensure category balance
+    random.Random(0).shuffle(all_examples)
 
     # Split: first half train, second half val
     mid = len(all_examples) // 2
@@ -132,28 +136,36 @@ def _ground_truth_to_canonical(raw_gt: list[dict[str, Any]]) -> list[dict[str, A
 class BFCLEvaluator:
     """Evaluator for BFCL function-calling tasks.
 
-    Compares predicted function calls against ground truth using
-    structural matching with acceptable value lists.
+    Uses the official bfcl-eval ast_checker for evaluation.
     """
 
     def __call__(self, data: dict[str, Any], response: str) -> dict[str, Any]:
-        raw_gt = json.loads(data["additional_context"]["ground_truth_raw"])
-        predicted_calls = _parse_model_response(response)
+        from bfcl_eval.constants.enums import Language
+        from bfcl_eval.eval_checker.ast_eval.ast_checker import ast_checker
 
-        if predicted_calls is None:
+        category = data["additional_context"]["category"]
+        raw_gt = json.loads(data["additional_context"]["ground_truth_raw"])
+        func_schemas = json.loads(data["additional_context"]["function_schemas"])
+
+        parsed = _parse_model_response(response)
+        if parsed is None:
             return {
                 "score": 0.0,
                 "feedback": f"Could not parse function calls from response. Response excerpt: {response[-300:]}",
             }
 
-        is_correct, details = _compare_calls(predicted_calls, raw_gt)
+        # Convert our format [{"name": "f", "arguments": {...}}] to official format [{"f": {...}}]
+        decoded = [{call["name"]: call.get("arguments", {})} for call in parsed]
 
-        if is_correct:
+        result = ast_checker(func_schemas, decoded, raw_gt, Language.PYTHON, category, "DeepSeek-V3.2-Exp")
+
+        if result["valid"]:
             return {"score": 1.0, "feedback": "Correct function call(s)."}
-        return {"score": 0.0, "feedback": details}
+        error_msg = "; ".join(result.get("error", []))
+        return {"score": 0.0, "feedback": error_msg or "Incorrect function call."}
 
 
-def _parse_model_response(response: str) -> Optional[list[dict[str, Any]]]:
+def _parse_model_response(response: str) -> list[dict[str, Any]] | None:
     """Parse model response into a list of function call dicts.
 
     Supports:
@@ -191,141 +203,3 @@ def _parse_model_response(response: str) -> Optional[list[dict[str, Any]]]:
             call["arguments"] = {}
 
     return parsed
-
-
-def _values_match(predicted: Any, acceptable: Any) -> bool:
-    """Check if a predicted value matches an acceptable value.
-
-    Handles numeric type coercion (int/float) and string comparison.
-    """
-    # Both numeric: compare with tolerance
-    if isinstance(predicted, (int, float)) and isinstance(acceptable, (int, float)):
-        if isinstance(predicted, float) or isinstance(acceptable, float):
-            return math.isclose(float(predicted), float(acceptable), rel_tol=1e-9)
-        return predicted == acceptable
-
-    # Try numeric coercion if one is string
-    if isinstance(predicted, str) and isinstance(acceptable, (int, float)):
-        try:
-            predicted_num = float(predicted)
-            if isinstance(acceptable, int) and predicted_num == int(predicted_num):
-                return int(predicted_num) == acceptable
-            return math.isclose(predicted_num, float(acceptable), rel_tol=1e-9)
-        except (ValueError, TypeError):
-            pass
-
-    if isinstance(acceptable, str) and isinstance(predicted, (int, float)):
-        try:
-            acceptable_num = float(acceptable)
-            if isinstance(predicted, int) and acceptable_num == int(acceptable_num):
-                return predicted == int(acceptable_num)
-            return math.isclose(float(predicted), acceptable_num, rel_tol=1e-9)
-        except (ValueError, TypeError):
-            pass
-
-    # String comparison (case-sensitive)
-    return str(predicted) == str(acceptable)
-
-
-def _compare_calls(
-    predicted: list[dict[str, Any]], raw_gt: list[dict[str, Any]]
-) -> tuple[bool, str]:
-    """Compare predicted function calls against ground truth.
-
-    Ground truth format: [{"func_name": {"param": [acceptable_val1, ...]}}]
-    Predicted format: [{"name": "func_name", "arguments": {"param": value}}]
-
-    For multiple calls (parallel), matching is order-independent.
-    """
-    if len(predicted) != len(raw_gt):
-        return False, (
-            f"Expected {len(raw_gt)} function call(s), got {len(predicted)}."
-        )
-
-    # For single call, match directly
-    if len(raw_gt) == 1:
-        ok, detail = _compare_single_call(predicted[0], raw_gt[0])
-        return ok, detail
-
-    # For multiple calls, try all permutation-free matching (greedy)
-    gt_matched = [False] * len(raw_gt)
-    pred_matched = [False] * len(predicted)
-    mismatch_details: list[str] = []
-
-    for pi, pred_call in enumerate(predicted):
-        found = False
-        for gi, gt_call in enumerate(raw_gt):
-            if gt_matched[gi]:
-                continue
-            ok, _ = _compare_single_call(pred_call, gt_call)
-            if ok:
-                gt_matched[gi] = True
-                pred_matched[pi] = True
-                found = True
-                break
-        if not found:
-            mismatch_details.append(
-                f"Predicted call '{pred_call.get('name', '?')}' did not match any ground truth."
-            )
-
-    if all(gt_matched):
-        return True, ""
-
-    unmatched_gt = [
-        list(raw_gt[i].keys())[0] for i in range(len(raw_gt)) if not gt_matched[i]
-    ]
-    return False, (
-        f"Unmatched ground truth calls: {unmatched_gt}. " + " ".join(mismatch_details)
-    )
-
-
-def _compare_single_call(
-    predicted: dict[str, Any], gt_call: dict[str, Any]
-) -> tuple[bool, str]:
-    """Compare a single predicted call against a single ground truth call.
-
-    gt_call format: {"func_name": {"param": [acceptable_values]}}
-    """
-    gt_func_name = list(gt_call.keys())[0]
-    gt_params = gt_call[gt_func_name]
-
-    pred_name = predicted.get("name", "")
-    pred_args = predicted.get("arguments", {})
-
-    if pred_name != gt_func_name:
-        return False, f"Expected function '{gt_func_name}', got '{pred_name}'."
-
-    # Check each ground truth parameter
-    for param_name, acceptable_values in gt_params.items():
-        is_optional = "" in acceptable_values
-
-        if param_name not in pred_args:
-            if is_optional:
-                continue
-            return False, (
-                f"Function '{gt_func_name}': missing required parameter '{param_name}'."
-            )
-
-        pred_value = pred_args[param_name]
-        non_empty_acceptable = [v for v in acceptable_values if v != ""]
-
-        if not non_empty_acceptable:
-            # Only "" is acceptable, meaning param should not be provided
-            # but model provided it - that's okay if value is empty-ish
-            continue
-
-        matched = any(_values_match(pred_value, av) for av in non_empty_acceptable)
-        if not matched:
-            return False, (
-                f"Function '{gt_func_name}': parameter '{param_name}' = {pred_value!r}, "
-                f"expected one of {non_empty_acceptable}."
-            )
-
-    # Check for extra parameters not in ground truth
-    for param_name in pred_args:
-        if param_name not in gt_params:
-            return False, (
-                f"Function '{gt_func_name}': unexpected parameter '{param_name}'."
-            )
-
-    return True, ""

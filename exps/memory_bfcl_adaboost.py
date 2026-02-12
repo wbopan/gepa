@@ -1,10 +1,11 @@
 #!/usr/bin/env python3
-"""BFCL v3 function-calling experiment using MemoryAdapter with DeepSeek V3.2."""
+"""BFCL v3 function-calling experiment using MemoryAdapter with AdaBoost batch sampling."""
 
 import gepa
 from gepa import LiteLLMCacheLogger, VerboseCallback, get_logger
 from gepa.adapters.memory_adapter import MemoryAdapter
 from gepa.examples.bfcl import BFCLEvaluator, init_dataset
+from gepa.strategies import AdaBoostBatchSampler
 
 logger = get_logger()
 
@@ -47,7 +48,7 @@ def main() -> None:
         valset=valset,
         adapter=adapter,
         max_metric_calls=1000,
-        reflection_minibatch_size=5,
+        batch_sampler=AdaBoostBatchSampler(minibatch_size=5),
         display_progress_bar=True,
         seed=42,
         use_weave=True,

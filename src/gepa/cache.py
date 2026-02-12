@@ -50,6 +50,9 @@ def configure_cache(
         )
 
     elif backend == "redis":
+        from redis.backoff import ExponentialBackoff
+        from redis.retry import Retry
+
         litellm.cache = Cache(
             type="redis",
             host=kwargs.pop("host", os.environ.get("REDIS_HOST")),
@@ -57,6 +60,8 @@ def configure_cache(
             password=kwargs.pop("password", os.environ.get("REDIS_PASSWORD")),
             ssl=kwargs.pop("ssl", True),  # Upstash requires TLS
             ttl=kwargs.pop("ttl", 60 * 60 * 24 * 180),  # Default: 180 days (litellm defaults to 60s)
+            retry=kwargs.pop("retry", Retry(ExponentialBackoff(base=0.1), retries=3)),
+            retry_on_error=kwargs.pop("retry_on_error", [ConnectionError]),
             **kwargs,
         )
 

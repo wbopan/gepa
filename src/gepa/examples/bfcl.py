@@ -27,7 +27,7 @@ def init_dataset(
     from huggingface_hub import hf_hub_download
 
     if categories is None:
-        categories = ["simple", "multiple"]
+        categories = ["live_simple"]
 
     repo_id = "gorilla-llm/Berkeley-Function-Calling-Leaderboard"
 

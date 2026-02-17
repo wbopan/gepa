@@ -127,7 +127,7 @@ Here is how it performed:
 
 ## Your Task
 Analyze the feedback and propose a SINGLE edit to improve the memory. \
-You can perform one of these operations:
+You can CREATE new knowledge entries, UPDATE existing ones, or DELETE entries that are unhelpful.
 
 **UPDATE** an existing entry: Change the content of an entry to fix errors or add information.
 **CREATE** a new entry: Add a new `<entry key="...">...</entry>` block inside the <memory> tags.
@@ -143,7 +143,6 @@ Rules:
 - `old_string` must match EXACTLY (including whitespace and newlines) a substring of the current memory XML.
 - For CREATE: use `old_string` = `"</memory>"` and `new_string` = `"<entry key=\\"new_key\\">content</entry>\\n</memory>"`.
 - For DELETE: set `old_string` to the full `<entry key="...">...</entry>` block and `new_string` to `""`.
-- Make the smallest edit that addresses the most impactful feedback.
 - If the memory is empty, create the most useful entry based on the feedback.
 
 Output ONLY the JSON object, no other text."""
@@ -216,7 +215,7 @@ Output ONLY the JSON object, no other text."""
             EvaluationBatch with outputs, scores, and optional trajectories.
         """
         memory_xml = candidate.get("memory", "<memory>\n</memory>")
-        system_prompt, memory_markdown = self._build_evaluation_context(memory_xml)
+        per_item_contexts = self._build_batch_contexts(batch, memory_xml)
 
         logger.log(
             f"Evaluating batch of {len(batch)} items (capture_traces={capture_traces})",
@@ -225,7 +224,7 @@ Output ONLY the JSON object, no other text."""
         logger.debug(
             f"Memory entries: {len(parse_memory_xml(memory_xml)) if memory_xml.strip() else 0}", header="evaluate"
         )
-        logger.debug(f"System prompt:\n{system_prompt}", header="prompt")
+        logger.debug(f"System prompt:\n{per_item_contexts[0][0] if per_item_contexts else ''}", header="prompt")
 
         outputs: list[MemoryOutput] = []
         scores: list[float] = []
@@ -234,10 +233,10 @@ Output ONLY the JSON object, no other text."""
         # Build messages for batch
         messages_list = [
             [
-                {"role": "system", "content": system_prompt},
+                {"role": "system", "content": ctx[0]},
                 {"role": "user", "content": item["input"]},
             ]
-            for item in batch
+            for item, ctx in zip(batch, per_item_contexts, strict=True)
         ]
 
         # Call task LLM
@@ -268,8 +267,8 @@ Output ONLY the JSON object, no other text."""
                 trajectories.append(
                     {
                         "data": item,
-                        "system_prompt": system_prompt,
-                        "memory_markdown": memory_markdown,
+                        "system_prompt": per_item_contexts[idx][0],
+                        "memory_markdown": per_item_contexts[idx][1],
                         "full_assistant_response": response_text,
                         "score": score,
                         "feedback": feedback,
@@ -423,6 +422,26 @@ Output ONLY the JSON object, no other text."""
     # Private helpers
     # ========================================================================
 
+    def _build_batch_contexts(
+        self,
+        batch: list[MemoryDataInst],
+        memory_xml: str,
+    ) -> list[tuple[str, str]]:
+        """Build (system_prompt, memory_markdown) for each item in the batch.
+
+        Subclasses override this to implement per-item routing.
+        Default: same context for all items (current behavior).
+
+        Args:
+            batch: Dataset items to evaluate.
+            memory_xml: The memory XML string.
+
+        Returns:
+            List of (full_system_prompt, memory_markdown) tuples, one per item.
+        """
+        system_prompt, memory_markdown = self._build_evaluation_context(memory_xml)
+        return [(system_prompt, memory_markdown)] * len(batch)
+
     def _build_evaluation_context(self, memory_xml: str) -> tuple[str, str]:
         """Build the full system prompt by appending memory to the base prompt.
 
@@ -438,13 +457,20 @@ Output ONLY the JSON object, no other text."""
             entries = []
 
         memory_markdown = format_memory_as_markdown(entries)
+        return self._format_system_prompt(memory_markdown), memory_markdown
 
+    def _format_system_prompt(self, memory_markdown: str) -> str:
+        """Build the full system prompt by appending memory markdown to the base prompt.
+
+        Args:
+            memory_markdown: Rendered memory markdown string.
+
+        Returns:
+            Full system prompt string.
+        """
         if memory_markdown:
-            full_prompt = f"{self.base_system_prompt}\n\n# Knowledge Memory\n{memory_markdown}"
-        else:
-            full_prompt = self.base_system_prompt
-
-        return full_prompt, memory_markdown
+            return f"{self.base_system_prompt}\n\n# Knowledge Memory\n{memory_markdown}"
+        return self.base_system_prompt
 
     def _call_task_model(self, messages_list: list[list[dict[str, str]]]) -> list[str]:
         """Call the task model for a batch of message lists.

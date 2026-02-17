@@ -18,12 +18,14 @@ from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from .memory_adapter import MemoryAdapter, MemoryDataInst, MemoryOutput, MemoryTrajectory
+    from .routing_adapter import RoutingMemoryAdapter
 
 __all__ = [
     "MemoryAdapter",
     "MemoryDataInst",
     "MemoryOutput",
     "MemoryTrajectory",
+    "RoutingMemoryAdapter",
 ]
 
 
@@ -33,5 +35,10 @@ def __getattr__(name: str):
         from .memory_adapter import MemoryAdapter, MemoryDataInst, MemoryOutput, MemoryTrajectory
 
         return locals()[name]
+
+    if name == "RoutingMemoryAdapter":
+        from .routing_adapter import RoutingMemoryAdapter
+
+        return RoutingMemoryAdapter
 
     raise AttributeError(f"module {__name__!r} has no attribute {name!r}")

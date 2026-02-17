@@ -26,7 +26,7 @@ SYSTEM_PROMPT = (
 
 def main() -> None:
     trainset, valset, _ = init_dataset(
-        categories=["simple", "multiple", "parallel", "parallel_multiple", "live_simple", "live_multiple"]
+        categories=["live_simple"]
     )
     trainset, valset = trainset[:30], valset[:30]
     logger.log(f"Loaded {len(trainset)} train, {len(valset)} val examples", header="init")

@@ -1,15 +1,16 @@
 #!/usr/bin/env python3
-"""BFCL v3 function-calling experiment using MemoryAdapter with DeepSeek V3.2."""
+"""BFCL v3 function-calling experiment using RoutingMemoryAdapter with DeepSeek V3.2."""
 
 import gepa
 from gepa import LiteLLMCacheLogger, VerboseCallback, get_logger
-from gepa.adapters.memory_adapter import MemoryAdapter
+from gepa.adapters.memory_adapter import RoutingMemoryAdapter
 from gepa.examples.bfcl import BFCLEvaluator, init_dataset
 
 logger = get_logger()
 
 TASK_MODEL = "openrouter/deepseek/deepseek-v3.2"
 REFLECTION_MODEL = "openrouter/deepseek/deepseek-v3.2"
+ROUTING_MODEL = "openrouter/deepseek/deepseek-v3.2"
 
 SYSTEM_PROMPT = (
     "You are a function calling AI model. You are provided with function signatures "
@@ -31,13 +32,15 @@ def main() -> None:
 
     LiteLLMCacheLogger.register()
 
-    adapter = MemoryAdapter(
+    adapter = RoutingMemoryAdapter(
         task_model=TASK_MODEL,
         reflection_model=REFLECTION_MODEL,
+        routing_model=ROUTING_MODEL,
         evaluator=BFCLEvaluator(),
         base_system_prompt=SYSTEM_PROMPT,
         max_entries=50,
         max_retries=2,
+        route_top_k=3,
     )
 
     result = gepa.optimize(

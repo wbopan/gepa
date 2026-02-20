@@ -9,14 +9,12 @@ A lightweight version of gpqa_diamond.py for quick validation.
 
 import gepa
 from gepa import LiteLLMCacheLogger, VerboseCallback, get_logger
-from gepa.examples.gpqa import init_dataset
 
 logger = get_logger()
 
 
 def main() -> None:
-    trainset, valset, _ = init_dataset()
-    trainset, valset = trainset[:3], valset[:3]
+    trainset, valset, _ = gepa.load_dataset("gpqa", train_size=3, val_size=3)
     logger.log(f"Loaded {len(trainset)} train, {len(valset)} val examples", header="init")
 
     LiteLLMCacheLogger.register()

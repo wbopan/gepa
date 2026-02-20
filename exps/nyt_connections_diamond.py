@@ -3,14 +3,13 @@
 
 import gepa
 from gepa import LiteLLMCacheLogger, VerboseCallback, get_logger
-from gepa.examples.nyt_connections import ConnectionsEvaluator, init_dataset
+from gepa.examples.nyt_connections import ConnectionsEvaluator
 
 logger = get_logger()
 
 
 def main() -> None:
-    trainset, valset, _ = init_dataset()
-    trainset, valset = trainset[:30], valset[:30]
+    trainset, valset, _ = gepa.load_dataset("nyt_connections", train_size=30, val_size=30)
     logger.log(f"Loaded {len(trainset)} train, {len(valset)} val examples", header="init")
 
     LiteLLMCacheLogger.register()

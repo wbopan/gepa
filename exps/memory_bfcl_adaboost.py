@@ -4,7 +4,7 @@
 import gepa
 from gepa import LiteLLMCacheLogger, VerboseCallback, get_logger
 from gepa.adapters.memory_adapter import MemoryAdapter
-from gepa.examples.bfcl import BFCLEvaluator, init_dataset
+from gepa.examples.bfcl import BFCLEvaluator
 from gepa.strategies import AdaBoostBatchSampler
 
 logger = get_logger()
@@ -25,10 +25,7 @@ SYSTEM_PROMPT = (
 
 
 def main() -> None:
-    trainset, valset, _ = init_dataset(
-        categories=["live_simple"]
-    )
-    trainset, valset = trainset[:30], valset[:30]
+    trainset, valset, _ = gepa.load_dataset("bfcl", categories=["live_simple"], train_size=30, val_size=30)
     logger.log(f"Loaded {len(trainset)} train, {len(valset)} val examples", header="init")
 
     LiteLLMCacheLogger.register()
@@ -43,7 +40,9 @@ def main() -> None:
     )
 
     result = gepa.optimize(
-        seed_candidate={"memory": '<memory>\n<entry key="General Knowledge">Think step by step carefully.</entry>\n</memory>'},
+        seed_candidate={
+            "memory": '<memory>\n<entry key="General Knowledge">Think step by step carefully.</entry>\n</memory>'
+        },
         trainset=trainset,
         valset=valset,
         adapter=adapter,

@@ -3,18 +3,13 @@
 
 import gepa
 from gepa import LiteLLMCacheLogger, get_logger
-from gepa.examples.nyt_connections import ConnectionsEvaluator, init_dataset
+from gepa.examples.nyt_connections import ConnectionsEvaluator
 
 logger = get_logger()
 
 
 def main() -> None:
-    # Load dataset with small subset for testing
-    trainset, valset, _ = init_dataset()
-    logger.log(f"Loaded {len(trainset)} train, {len(valset)} val examples total", header="init")
-
-    # Use only 2 examples each for quick testing
-    trainset, valset = trainset[:2], valset[:2]
+    trainset, valset, _ = gepa.load_dataset("nyt_connections", train_size=2, val_size=2)
     logger.log(f"Using {len(trainset)} train, {len(valset)} val examples for test", header="init")
 
     # Print sample data for verification

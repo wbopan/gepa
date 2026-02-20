@@ -4,7 +4,6 @@
 import gepa
 from gepa import LiteLLMCacheLogger, VerboseCallback, get_logger
 from gepa.adapters.memory_adapter import MemoryAdapter
-from gepa.examples.gpqa import init_dataset
 
 logger = get_logger()
 
@@ -32,8 +31,7 @@ def gpqa_evaluator(data, response):
 
 
 def main() -> None:
-    trainset, valset, _ = init_dataset()
-    trainset, valset = trainset[:30], valset[:30]
+    trainset, valset, _ = gepa.load_dataset("gpqa", train_size=30, val_size=30)
     logger.log(f"Loaded {len(trainset)} train, {len(valset)} val examples", header="init")
 
     LiteLLMCacheLogger.register()
@@ -48,7 +46,9 @@ def main() -> None:
     )
 
     result = gepa.optimize(
-        seed_candidate={"memory": '<memory>\n<entry key="General Knowledge">Think step by step carefully.</entry>\n</memory>'},
+        seed_candidate={
+            "memory": '<memory>\n<entry key="General Knowledge">Think step by step carefully.</entry>\n</memory>'
+        },
         trainset=trainset,
         valset=valset,
         adapter=adapter,

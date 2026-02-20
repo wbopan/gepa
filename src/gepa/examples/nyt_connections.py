@@ -46,9 +46,7 @@ class ConnectionsEvaluator:
                 groups.append(set(words))
         return groups
 
-    def _count_correct_groups(
-        self, predicted: list[set[str]], answer: list[set[str]]
-    ) -> int:
+    def _count_correct_groups(self, predicted: list[set[str]], answer: list[set[str]]) -> int:
         """Count how many predicted groups exactly match answer groups."""
         correct = 0
         used_answers = set()
@@ -88,9 +86,7 @@ class ConnectionsEvaluator:
 
         feedback_parts = []
         if correct_groups:
-            feedback_parts.append(
-                f"Correctly grouped: {len(correct_groups)}/4 categories."
-            )
+            feedback_parts.append(f"Correctly grouped: {len(correct_groups)}/4 categories.")
         if incorrect_groups:
             feedback_parts.append(f"Incorrectly grouped: {len(incorrect_groups)} categories.")
 

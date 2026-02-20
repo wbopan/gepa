@@ -194,6 +194,11 @@ Output ONLY the JSON object, no other text."""
             md = format_memory_as_markdown(selected_entries)
             sp = self._format_system_prompt(md)
             contexts.append((sp, md))
+
+        for idx, (sp, md) in enumerate(contexts):
+            keys = self._extract_keys_from_markdown(md)
+            logger.debug(f"Item {idx}: routed to {keys}", header="route")
+
         return contexts
 
     def _route_batch(

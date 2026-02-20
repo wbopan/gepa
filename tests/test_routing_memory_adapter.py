@@ -322,6 +322,93 @@ class TestRoutingAdapterInit:
 
 
 # ============================================================================
+# Reflective dataset and routing info tests
+# ============================================================================
+
+
+class TestReflectiveDatasetWithRouting:
+    """Tests for make_reflective_dataset() with per-query routing info."""
+
+    def test_make_reflective_dataset_includes_entries_used(self, routing_adapter, populated_candidate):
+        """Reflective dataset examples should include 'Entries Used' with correct entry keys."""
+        batch: list[MemoryDataInst] = [
+            {"input": "How do I authenticate?", "answer": "Bearer tokens"},
+            {"input": "What about rate limits?", "answer": "100 requests"},
+        ]
+        # Routing mock returns "1, 3" → entries "API Authentication" and "Date Formatting"
+        eval_result = routing_adapter.evaluate(batch, populated_candidate, capture_traces=True)
+        reflective_data = routing_adapter.make_reflective_dataset(
+            populated_candidate, eval_result, ["memory"]
+        )
+
+        assert "memory" in reflective_data
+        examples = reflective_data["memory"]
+        assert len(examples) == 2
+
+        for ex in examples:
+            assert "Entries Used" in ex
+            assert ex["Entries Used"] == ["API Authentication", "Date Formatting"]
+
+    def test_format_feedback_examples_with_entries_used(self):
+        """_format_feedback_examples should include **Entries Used:** line."""
+        examples = [
+            {
+                "Inputs": {"user_input": "How to auth?", "expected_answer": "Use tokens"},
+                "Entries Used": ["API Authentication", "Rate Limiting"],
+                "Generated Outputs": "Use Bearer tokens.",
+                "Feedback": "Correct.",
+            },
+            {
+                "Inputs": {"user_input": "Date format?", "expected_answer": "ISO 8601"},
+                "Entries Used": ["Date Formatting"],
+                "Generated Outputs": "Use ISO 8601.",
+                "Feedback": "Correct.",
+            },
+        ]
+        result = RoutingMemoryAdapter._format_feedback_examples(examples)
+
+        assert "**Entries Used:** API Authentication, Rate Limiting" in result
+        assert "**Entries Used:** Date Formatting" in result
+        # Verify ordering: Entries Used comes after User Input and before Expected Answer
+        lines = result.split("\n")
+        for i, line in enumerate(lines):
+            if "**Entries Used:**" in line:
+                # Previous non-empty line should be User Input
+                prev = lines[i - 1]
+                assert "**User Input:**" in prev
+                # Next line should be Expected Answer
+                nxt = lines[i + 1]
+                assert "**Expected Answer:**" in nxt
+
+    def test_format_feedback_examples_without_entries_used(self):
+        """_format_feedback_examples should skip **Entries Used:** line when key is absent."""
+        examples = [
+            {
+                "Inputs": {"user_input": "test", "expected_answer": "answer"},
+                "Generated Outputs": "response",
+                "Feedback": "ok",
+            },
+        ]
+        result = RoutingMemoryAdapter._format_feedback_examples(examples)
+        assert "**Entries Used:**" not in result
+        assert "**User Input:** test" in result
+
+    def test_extract_keys_from_markdown(self):
+        """_extract_keys_from_markdown should parse ## headers."""
+        md = "## API Authentication\nUse Bearer tokens\n\n## Rate Limiting\nMax 100 req/min"
+        keys = RoutingMemoryAdapter._extract_keys_from_markdown(md)
+        assert keys == ["API Authentication", "Rate Limiting"]
+
+    def test_extract_keys_from_empty_markdown(self):
+        """Empty markdown should return empty list."""
+        assert RoutingMemoryAdapter._extract_keys_from_markdown("") == []
+
+    def test_extract_keys_from_markdown_no_headers(self):
+        """Markdown without ## headers should return empty list."""
+        assert RoutingMemoryAdapter._extract_keys_from_markdown("Just plain text\nNo headers") == []
+
+
+# ============================================================================
 # Import test
 # ============================================================================
 

@@ -13,11 +13,13 @@ queries routed to other entries produce identical LLM calls and hit the litellm 
 """
 
 import re
-from typing import Callable
+from collections.abc import Mapping, Sequence
+from typing import Any, Callable
 
+from gepa.core.adapter import EvaluationBatch
 from gepa.logging import get_logger
 
-from .memory_adapter import MemoryAdapter, MemoryDataInst
+from .memory_adapter import MemoryAdapter, MemoryDataInst, MemoryOutput, MemoryTrajectory
 from .memory_store import MemoryEntry, format_memory_as_markdown, parse_memory_xml
 
 logger = get_logger()
@@ -52,6 +54,47 @@ class RoutingMemoryAdapter(MemoryAdapter):
         **kwargs: Forwarded to MemoryAdapter.__init__.
     """
 
+    EDIT_PROPOSAL_PROMPT = """\
+You are optimizing a knowledge memory store used by an AI assistant. \
+The memory contains key-value entries that provide the assistant with \
+domain knowledge, instructions, and context to answer user queries.
+
+## Current Memory (XML format)
+```
+<current_memory>
+```
+
+## Task Performance Feedback
+For each query, the assistant selected and read the most relevant entries from the memory. \
+The entries used are listed per example.
+```
+<feedback_examples>
+```
+
+## Your Task
+Analyze the feedback and propose a SINGLE edit to improve the memory. \
+You can CREATE new knowledge entries, UPDATE existing ones, or DELETE entries that are unhelpful.
+
+Entry keys are used to route queries to relevant entries — clear, descriptive keys improve routing accuracy.
+
+**UPDATE** an existing entry: Change the content of an entry to fix errors or add information.
+**CREATE** a new entry: Add a new `<entry key="...">...</entry>` block inside the <memory> tags.
+**DELETE** an entry: Remove an entire `<entry key="...">...</entry>` block.
+**RENAME** a key: Change an entry's key attribute.
+
+Output a JSON object with exactly two keys:
+```json
+{"old_string": "exact text to find in the XML", "new_string": "replacement text"}
+```
+
+Rules:
+- `old_string` must match EXACTLY (including whitespace and newlines) a substring of the current memory XML.
+- For CREATE: use `old_string` = `"</memory>"` and `new_string` = `"<entry key=\\"new_key\\">content</entry>\\n</memory>"`.
+- For DELETE: set `old_string` to the full `<entry key="...">...</entry>` block and `new_string` to `""`.
+- If the memory is empty, create the most useful entry based on the feedback.
+
+Output ONLY the JSON object, no other text."""
+
     def __init__(
         self,
         *,
@@ -67,6 +110,66 @@ class RoutingMemoryAdapter(MemoryAdapter):
 
             self._litellm = litellm
         self.route_top_k = route_top_k
+
+    # ========================================================================
+    # Reflective dataset overrides
+    # ========================================================================
+
+    def make_reflective_dataset(
+        self,
+        candidate: dict[str, str],
+        eval_batch: EvaluationBatch[MemoryTrajectory, MemoryOutput],
+        components_to_update: list[str],
+    ) -> dict[str, list[dict[str, Any]]]:
+        """Build reflective dataset with per-query routing info.
+
+        Extends the parent implementation by adding an "Entries Used" key
+        to each example, extracted from the trajectory's memory_markdown.
+        """
+        reflective_data = super().make_reflective_dataset(candidate, eval_batch, components_to_update)
+
+        if "memory" not in reflective_data or not eval_batch.trajectories:
+            return reflective_data
+
+        for example, traj in zip(reflective_data["memory"], eval_batch.trajectories, strict=False):
+            example["Entries Used"] = self._extract_keys_from_markdown(traj["memory_markdown"])
+
+        return reflective_data
+
+    @staticmethod
+    def _format_feedback_examples(examples: Sequence[Mapping[str, Any]]) -> str:
+        """Format reflective examples with per-query entries-used info."""
+        parts = []
+        for i, ex in enumerate(examples, 1):
+            inputs = ex.get("Inputs", {})
+            generated = ex.get("Generated Outputs", "")
+            feedback = ex.get("Feedback", "")
+
+            section = f"### Example {i}\n"
+            section += f"**User Input:** {inputs.get('user_input', '')}\n"
+            entries_used = ex.get("Entries Used")
+            if entries_used is not None:
+                section += f"**Entries Used:** {', '.join(entries_used)}\n"
+            section += f"**Expected Answer:** {inputs.get('expected_answer', '')}\n"
+            section += f"**Assistant Response:** {generated}\n"
+            section += f"**Feedback:** {feedback}"
+            parts.append(section)
+
+        return "\n\n".join(parts)
+
+    @staticmethod
+    def _extract_keys_from_markdown(memory_markdown: str) -> list[str]:
+        """Extract entry keys from rendered memory markdown.
+
+        Memory markdown uses ## headers for entry keys.
+
+        Args:
+            memory_markdown: Rendered markdown from format_memory_as_markdown.
+
+        Returns:
+            List of entry key strings.
+        """
+        return [line[3:].strip() for line in memory_markdown.split("\n") if line.startswith("## ")]
 
     def _build_batch_contexts(
         self,

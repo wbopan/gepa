@@ -39,11 +39,6 @@ When modifying existing code or adding new features:
 - **Logging**: Use `get_logger()` from `gepa.logging` instead of Python's built-in `logging` or `print()`. Use `logger.log(msg, header="...")` for important messages with semantic headers (e.g., `"select"`, `"score"`, `"error"`), and `logger.debug()` for verbose output (enabled via `LOG_LEVEL=DEBUG`).
 - **Experiment tracking**: Runs are logged to Weights & Biases (wandb). Use the MCP wandb tools to query run metrics and check experiment status (entity: `bmpixel`, project: `gepa-boost`). Before analyzing wandb data, read `knowledge/architecture/wandb_tables_and_metrics.md` for the full list of logged tables, metrics, and their semantics.
 
-## Literature Review
-
-- **Paper scope**: Only read papers published at top-tier conferences (NeurIPS, ICML, ICLR, etc.) or arxiv papers from top institutions.
-- **Paper reading tool**: Always use the Papers MCP tool (`resolve-paper-id`, `extract-paper`) to read papers. **No agent may use WebFetch to fetch papers.**
-
 ## Key Concepts
 
 ### Trainset vs Valset

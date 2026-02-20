@@ -17,7 +17,6 @@ import pytest
 from gepa.adapters.memory_adapter.memory_adapter import MemoryAdapter, MemoryDataInst
 from gepa.adapters.memory_adapter.routing_adapter import RoutingMemoryAdapter
 
-
 # ============================================================================
 # Fixtures
 # ============================================================================
@@ -167,7 +166,7 @@ class TestBuildBatchContexts:
         contexts = routing_adapter._build_batch_contexts(batch, memory_xml)
 
         assert len(contexts) == 1
-        system_prompt, memory_md = contexts[0]
+        system_prompt, _memory_md = contexts[0]
 
         # Should contain selected entries
         assert "API Authentication" in system_prompt
@@ -181,12 +180,7 @@ class TestBuildBatchContexts:
     def test_fallback_when_few_entries(self, routing_adapter):
         """When entries <= top_k, routing is skipped and all entries are used."""
         # Only 2 entries, top_k=2 → no routing needed
-        memory_xml = (
-            "<memory>\n"
-            '<entry key="A">Content A</entry>\n'
-            '<entry key="B">Content B</entry>\n'
-            "</memory>"
-        )
+        memory_xml = '<memory>\n<entry key="A">Content A</entry>\n<entry key="B">Content B</entry>\n</memory>'
         batch: list[MemoryDataInst] = [{"input": "test", "answer": "test"}]
         contexts = routing_adapter._build_batch_contexts(batch, memory_xml)
 
@@ -337,9 +331,7 @@ class TestReflectiveDatasetWithRouting:
         ]
         # Routing mock returns "1, 3" → entries "API Authentication" and "Date Formatting"
         eval_result = routing_adapter.evaluate(batch, populated_candidate, capture_traces=True)
-        reflective_data = routing_adapter.make_reflective_dataset(
-            populated_candidate, eval_result, ["memory"]
-        )
+        reflective_data = routing_adapter.make_reflective_dataset(populated_candidate, eval_result, ["memory"])
 
         assert "memory" in reflective_data
         examples = reflective_data["memory"]

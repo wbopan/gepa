@@ -103,8 +103,7 @@ Output ONLY the JSON object, no other text."""
         **kwargs,
     ):
         super().__init__(**kwargs)
-        self.routing_model = routing_model if routing_model is not None else self.task_model
-        # Ensure litellm is imported if routing_model is a string
+        self.routing_model = routing_model or self.task_model
         if isinstance(self.routing_model, str) and not hasattr(self, "_litellm"):
             import litellm
 
@@ -269,7 +268,9 @@ Output ONLY the JSON object, no other text."""
             if not indices:
                 # Fallback: first top_k entries
                 indices = list(range(min(self.route_top_k, len(entries))))
-                logger.debug(f"Routing parse returned empty, falling back to first {len(indices)} entries", header="route")
+                logger.debug(
+                    f"Routing parse returned empty, falling back to first {len(indices)} entries", header="route"
+                )
             # Enforce top_k cap — LLM may return more than requested
             indices = indices[: self.route_top_k]
             logger.debug(f"Routed to entries: {indices} from response: {resp_text!r}", header="route")

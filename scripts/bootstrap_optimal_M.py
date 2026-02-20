@@ -9,11 +9,11 @@ Given:
 We simulate the gate behavior at different M values using our empirical data.
 """
 
-import wandb
+from collections import defaultdict
+
 import matplotlib.pyplot as plt
 import numpy as np
-from collections import defaultdict
-from scipy import stats
+import wandb
 
 # Initialize wandb API
 api = wandb.Api()
@@ -66,14 +66,16 @@ for run in runs:
             if parent_score is None:
                 continue
 
-            all_data.append({
-                "run_name": run.displayName,
-                "parent_score": parent_score,
-                "child_score": child_score,
-                "true_delta": child_score - parent_score,
-            })
+            all_data.append(
+                {
+                    "run_name": run.displayName,
+                    "parent_score": parent_score,
+                    "child_score": child_score,
+                    "true_delta": child_score - parent_score,
+                }
+            )
 
-    except Exception as e:
+    except Exception:
         continue
 
 print(f"Loaded {len(all_data)} parent-child pairs")
@@ -190,9 +192,11 @@ for M in M_VALUES:
     result = run_simulation(M, true_deltas, base_variance, K, N_SIMULATIONS)
     results.append(result)
     if M <= 10 or M % 5 == 0:
-        print(f"  M={M:2d}: pass_rate={result['gate_pass_rate']:.2f}, "
-              f"precision={result['precision']:.2f}, "
-              f"efficiency={result['efficiency']:.4f}")
+        print(
+            f"  M={M:2d}: pass_rate={result['gate_pass_rate']:.2f}, "
+            f"precision={result['precision']:.2f}, "
+            f"efficiency={result['efficiency']:.4f}"
+        )
 
 # Find optimal M
 efficiencies = [r["efficiency"] for r in results]
@@ -211,8 +215,12 @@ Ms = [r["M"] for r in results]
 # Plot 1: Gate Pass Rate vs M
 ax1 = axes[0, 0]
 ax1.plot(Ms, [r["gate_pass_rate"] for r in results], "b-o", markersize=4)
-ax1.axhline(y=(true_deltas > 0).mean(), color="r", linestyle="--",
-            label=f"True improvement rate ({(true_deltas > 0).mean():.2f})")
+ax1.axhline(
+    y=(true_deltas > 0).mean(),
+    color="r",
+    linestyle="--",
+    label=f"True improvement rate ({(true_deltas > 0).mean():.2f})",
+)
 ax1.axvline(x=optimal_M, color="g", linestyle=":", alpha=0.7)
 ax1.set_xlabel("Minibatch Size M")
 ax1.set_ylabel("Gate Pass Rate")
@@ -275,24 +283,31 @@ True improvement rate: {(true_deltas > 0).mean():.1%}
 True mean Δ: {true_deltas.mean():.4f}
 
 Current M ≈ 5:
-  Gate pass rate: {results[4]['gate_pass_rate']:.1%}
-  Precision: {results[4]['precision']:.1%}
-  Efficiency: {results[4]['efficiency']:.4f}
+  Gate pass rate: {results[4]["gate_pass_rate"]:.1%}
+  Precision: {results[4]["precision"]:.1%}
+  Efficiency: {results[4]["efficiency"]:.4f}
 
 OPTIMAL M* = {optimal_M}:
-  Gate pass rate: {results[optimal_idx]['gate_pass_rate']:.1%}
-  Precision: {results[optimal_idx]['precision']:.1%}
-  Efficiency: {results[optimal_idx]['efficiency']:.4f}
+  Gate pass rate: {results[optimal_idx]["gate_pass_rate"]:.1%}
+  Precision: {results[optimal_idx]["precision"]:.1%}
+  Efficiency: {results[optimal_idx]["efficiency"]:.4f}
 
 Improvement: {(efficiencies[optimal_idx] / efficiencies[4] - 1) * 100:.1f}%
 over current M=5
 
 Recommendation:
-{'Increase M to ' + str(optimal_M) if optimal_M > 5 else 'Current M is near optimal'}
+{"Increase M to " + str(optimal_M) if optimal_M > 5 else "Current M is near optimal"}
 """
-ax6.text(0.1, 0.5, summary_text, transform=ax6.transAxes, fontsize=11,
-         verticalalignment="center", fontfamily="monospace",
-         bbox=dict(boxstyle="round", facecolor="wheat", alpha=0.5))
+ax6.text(
+    0.1,
+    0.5,
+    summary_text,
+    transform=ax6.transAxes,
+    fontsize=11,
+    verticalalignment="center",
+    fontfamily="monospace",
+    bbox=dict(boxstyle="round", facecolor="wheat", alpha=0.5),
+)
 
 plt.tight_layout()
 output_path = "/Users/panwenbo/Repos/gepa/analysis_output/optimal_minibatch_size.png"
@@ -306,5 +321,7 @@ print(f"{'M':>3} | {'Pass Rate':>10} | {'Precision':>10} | {'Cost':>8} | {'Effic
 print("-" * 70)
 for r in results:
     marker = " ***" if r["M"] == optimal_M else ""
-    print(f"{r['M']:>3} | {r['gate_pass_rate']:>10.2%} | {r['precision']:>10.2%} | "
-          f"{r['cost_total']:>8.1f} | {r['efficiency']:>10.5f}{marker}")
+    print(
+        f"{r['M']:>3} | {r['gate_pass_rate']:>10.2%} | {r['precision']:>10.2%} | "
+        f"{r['cost_total']:>8.1f} | {r['efficiency']:>10.5f}{marker}"
+    )

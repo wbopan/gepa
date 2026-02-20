@@ -48,9 +48,7 @@ def is_dominated(a: np.ndarray, b: np.ndarray) -> bool:
     return bool(np.all(b >= a) and np.any(b > a))
 
 
-def compute_pareto_frontier(
-    scores: np.ndarray, sample_indices: np.ndarray | None = None
-) -> tuple[list[int], float]:
+def compute_pareto_frontier(scores: np.ndarray, sample_indices: np.ndarray | None = None) -> tuple[list[int], float]:
     """Compute Pareto frontier for given scores.
 
     Args:
@@ -252,7 +250,7 @@ def domination_analysis(scores_dict: dict[str, np.ndarray]) -> dict:
         dom_sorted = np.sort(dominates_count)
         n = len(dom_sorted)
         cumsum = np.cumsum(dom_sorted)
-        gini = (2 * np.sum((np.arange(1, n + 1) * dom_sorted))) / (n * cumsum[-1]) - (n + 1) / n if cumsum[-1] > 0 else 0
+        gini = (2 * np.sum(np.arange(1, n + 1) * dom_sorted)) / (n * cumsum[-1]) - (n + 1) / n if cumsum[-1] > 0 else 0
 
         results[method] = {
             "n_candidates": n_candidates,
@@ -311,7 +309,7 @@ def create_visualizations(
     _fig, ax = plt.subplots(figsize=(8, 6))
     quality_data = [scores_dict[m].mean(axis=1) for m in methods]
     bp = ax.boxplot(quality_data, tick_labels=methods, patch_artist=True)
-    for patch, method in zip(bp["boxes"], methods):
+    for patch, method in zip(bp["boxes"], methods, strict=False):
         patch.set_facecolor(colors[method])
         patch.set_alpha(0.7)
 
@@ -345,7 +343,10 @@ def create_visualizations(
     means = [bootstrap_results[m]["mean"] for m in methods]
     ci_lowers = [bootstrap_results[m]["ci_lower"] for m in methods]
     ci_uppers = [bootstrap_results[m]["ci_upper"] for m in methods]
-    errors = [[m - l for m, l in zip(means, ci_lowers)], [u - m for m, u in zip(means, ci_uppers)]]
+    errors = [
+        [m - l for m, l in zip(means, ci_lowers, strict=False)],
+        [u - m for m, u in zip(means, ci_uppers, strict=False)],
+    ]
 
     ax.bar(x_pos, means, color=[colors[m] for m in methods], alpha=0.7)
     ax.errorbar(x_pos, means, yerr=errors, fmt="none", color="black", capsize=5)
@@ -443,7 +444,9 @@ def generate_report(results: dict, output_dir: Path) -> str:
 
     for method in ["adaboost", "bayesian", "baseline"]:
         qs = results["quality"]["quality_stats"][method]
-        lines.append(f"| {method} | {qs['mean']:.3f} | {qs['std']:.3f} | {qs['median']:.3f} | {qs['min']:.3f} | {qs['max']:.3f} |")
+        lines.append(
+            f"| {method} | {qs['mean']:.3f} | {qs['std']:.3f} | {qs['median']:.3f} | {qs['min']:.3f} | {qs['max']:.3f} |"
+        )
 
     lines.extend(
         [
@@ -466,7 +469,7 @@ def generate_report(results: dict, output_dir: Path) -> str:
             "",
             "## 4. Per-Sample Comparison",
             "",
-            f"Sample wins (which method has highest success rate on each sample):",
+            "Sample wins (which method has highest success rate on each sample):",
             "",
         ]
     )
@@ -484,7 +487,9 @@ def generate_report(results: dict, output_dir: Path) -> str:
 
     for comp, data in results["per_sample"]["pairwise_comparisons"].items():
         m1, m2 = comp.replace("_vs_", " vs ").split(" vs ")
-        lines.append(f"- **{comp}**: {m1} wins on {data['m1_wins']} samples, {m2} wins on {data['m2_wins']}, ties: {data['ties']}")
+        lines.append(
+            f"- **{comp}**: {m1} wins on {data['m1_wins']} samples, {m2} wins on {data['m2_wins']}, ties: {data['ties']}"
+        )
 
     lines.extend(
         [

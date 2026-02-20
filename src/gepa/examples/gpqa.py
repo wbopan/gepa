@@ -53,7 +53,7 @@ def init_dataset():
             "additional_context": {
                 "domain": x.get("High-level domain", ""),
                 "subdomain": x.get("Subdomain", ""),
-            }
+            },
         }
 
     all_examples = [format_example(x) for x in dataset]

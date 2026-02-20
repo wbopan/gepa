@@ -27,7 +27,7 @@ def fetch_candidate_prompts_table(entity: str, project: str, run_name: str) -> l
                     table_data = json.load(f)
                     columns = table_data["columns"]
                     for row in table_data["data"]:
-                        candidate_data.append(dict(zip(columns, row)))
+                        candidate_data.append(dict(zip(columns, row, strict=False)))
 
     return candidate_data
 
@@ -98,7 +98,7 @@ def plot_valset_scatter(pairs: list[dict], output_path: str, title: str = "Paren
     fig, ax = plt.subplots(figsize=(10, 10))
 
     # Color by improvement
-    colors = ["green" if c > p else "red" for p, c in zip(parent_scores, child_scores)]
+    colors = ["green" if c > p else "red" for p, c in zip(parent_scores, child_scores, strict=False)]
     ax.scatter(parent_scores, child_scores, c=colors, alpha=0.6, s=80)
 
     # Add diagonal line
@@ -133,9 +133,9 @@ def main():
     all_pairs = []
 
     for run in runs:
-        print(f"\n{'='*60}")
+        print(f"\n{'=' * 60}")
         print(f"Run: {run.name} ({run.display_name})")
-        print(f"{'='*60}")
+        print(f"{'=' * 60}")
 
         # Try to fetch the candidate_prompts table directly from history
         try:
@@ -149,7 +149,7 @@ def main():
                         with open(table_file) as f:
                             table_data = json.load(f)
                         columns = table_data["columns"]
-                        rows = [dict(zip(columns, row)) for row in table_data["data"]]
+                        rows = [dict(zip(columns, row, strict=False)) for row in table_data["data"]]
                         print(f"  Loaded {len(rows)} candidates")
 
                         # Build parent-child pairs
@@ -172,17 +172,19 @@ def main():
 
     # Plot combined
     if all_pairs:
-        print(f"\n{'='*60}")
+        print(f"\n{'=' * 60}")
         print(f"Combined: {len(all_pairs)} parent-child pairs")
-        print(f"{'='*60}")
-        plot_valset_scatter(all_pairs, str(output_dir / "valset_scatter_combined.png"), "Parent vs Child Validation Score (All Runs)")
+        print(f"{'=' * 60}")
+        plot_valset_scatter(
+            all_pairs, str(output_dir / "valset_scatter_combined.png"), "Parent vs Child Validation Score (All Runs)"
+        )
 
         # Compute statistics
         parent_scores = [p["parent_score"] for p in all_pairs]
         child_scores = [p["child_score"] for p in all_pairs]
-        improvements = [c - p for p, c in zip(parent_scores, child_scores)]
+        improvements = [c - p for p, c in zip(parent_scores, child_scores, strict=False)]
 
-        print(f"\nStatistics:")
+        print("\nStatistics:")
         print(f"  Total pairs: {len(all_pairs)}")
         print(f"  Mean parent score: {np.mean(parent_scores):.4f}")
         print(f"  Mean child score: {np.mean(child_scores):.4f}")
@@ -202,7 +204,9 @@ def main():
         for bucket in sorted(buckets.keys()):
             children = buckets[bucket]
             improved = sum(1 for c in children if c > bucket)
-            print(f"  Parent {bucket:.1f}: n={len(children)}, mean_child={np.mean(children):.3f}, improved={improved}/{len(children)} ({improved/len(children)*100:.0f}%)")
+            print(
+                f"  Parent {bucket:.1f}: n={len(children)}, mean_child={np.mean(children):.3f}, improved={improved}/{len(children)} ({improved / len(children) * 100:.0f}%)"
+            )
 
 
 if __name__ == "__main__":

@@ -16,6 +16,7 @@ from .cache import configure_cache, disable_cache
 from .core.adapter import EvaluationBatch, GEPAAdapter
 from .core.callbacks import LiteLLMCacheLogger, VerboseCallback
 from .core.result import GEPAResult
+from .datasets import list_datasets, load_dataset
 from .examples import aime
 from .logging.logger import get_logger
 from .utils.stop_condition import (
@@ -32,6 +33,8 @@ from .utils.stop_condition import (
 __all__ = [
     "aime",
     "CompositeStopper",
+    "list_datasets",
+    "load_dataset",
     "configure_cache",
     "default_adapter",
     "disable_cache",

@@ -2,7 +2,6 @@
 # https://github.com/gepa-ai/gepa
 
 import json
-import random
 import re
 from typing import Any
 
@@ -99,13 +98,10 @@ def init_dataset(
                 }
             )
 
-    # Shuffle deterministically before splitting to ensure category balance
-    random.Random(0).shuffle(all_examples)
+    from gepa.datasets import split_and_shuffle
 
-    # Split: first half train, second half val
-    mid = len(all_examples) // 2
-    trainset = all_examples[:mid]
-    valset = all_examples[mid:]
+    # Shuffle deterministically before splitting to ensure category balance
+    trainset, valset = split_and_shuffle(all_examples, seed=0)
 
     return trainset, valset, []
 

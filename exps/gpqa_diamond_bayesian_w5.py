@@ -3,15 +3,13 @@
 
 import gepa
 from gepa import LiteLLMCacheLogger, VerboseCallback, get_logger
-from gepa.examples.gpqa import init_dataset
 from gepa.strategies import BayesianBatchSampler
 
 logger = get_logger()
 
 
 def main() -> None:
-    trainset, valset, _ = init_dataset()
-    trainset, valset = trainset[:30], valset[:30]
+    trainset, valset, _ = gepa.load_dataset("gpqa", train_size=30, val_size=30)
     logger.log(f"Loaded {len(trainset)} train, {len(valset)} val examples", header="init")
 
     LiteLLMCacheLogger.register()

@@ -525,21 +525,34 @@ MEMORY_SEARCH_SPACE = {
 
 ### 6.5 LLM 记忆系统文献
 
-19. **MemGPT/Letta** — 层级记忆管理系统，区分工作记忆和长期记忆
-20. **RAPTOR** (Sarthi et al., 2024) — 递归抽象处理树，层级化文档总结和检索
-21. **Self-RAG** (Asai et al., 2024) — 自适应检索增强生成
-22. **GraphRAG** (Microsoft, 2024) — 基于知识图谱的检索增强
+19. **MemGPT/Letta** (Packer et al., 2023) — OS 式层级记忆管理。核心: 主上下文(RAM) + 外部存储(Disk)的分层架构，LLM 自主决定 store/summarize/forget。Letta V1 (2025) 引入文件系统接口和共享记忆会话。
+20. **RAPTOR** (Sarthi et al., ICLR 2024) — 递归抽象处理树。**直接映射到我们的层级抽取**：embed chunks → cluster → summarize clusters → recursively repeat。在 QuALITY 上比基线提升 20% 绝对准确率。**关键发现**: collapsed tree（同时查询所有层级）优于逐层遍历，说明不同问题需要不同粒度的信息。
+21. **Self-RAG** (Asai et al., ICLR 2024 Oral) — 训练 LLM 发出反射 token 控制何时检索、检索是否相关、是否支持生成。实现按需检索。
+22. **GraphRAG** (Microsoft, 2024) — 实体中心知识图谱 + 社区摘要。多跳 QA 召回率提升 6.4 个点。
 
-### 6.6 层级搜索空间
+### 6.6 RL-based 记忆优化 (最新前沿，与 GEPA 高度相关)
 
-23. **Context-Free Grammar-Based Hierarchical NAS** (NeurIPS 2024) — 基于上下文无关文法的层级搜索空间统一框架，可生成比标准空间大 100+ 数量级的搜索空间。**关键启示**: 文法可以自然表达组合式、层级化的搜索空间结构，直接适用于记忆抽取管道的搜索空间定义。
-24. **LaMOO** (JMLR 2024) — 学习搜索空间分区，聚焦于可能包含 Pareto 最优解的区域。比标准 BO 和进化方法提升 200%+ 样本效率。
+23. **Memory-R1** (2025) — **里程碑论文**。用 PPO/GRPO 训练两个 RL 智能体: Memory Manager (学习 ADD/UPDATE/DELETE/NOOP) + Answer Agent (学习检索和过滤)。**仅需 152 个训练 QA 对**，F1 比 Mem0 提升 68.9%。**关键启示**: RL 是记忆优化的"缺失成分"，可以学习存什么、何时更新、如何检索。
+24. **Mem-alpha** (2025) — 模块化记忆架构 (core/episodic/semantic)，通过 Group-Relative PPO 训练。训练序列长度 30k tokens，**泛化到 400k+ tokens (13x)**。**启示**: 小数据集上优化的记忆策略可以泛化到大规模场景。
+25. **Memento** (2025) — 从交互 traces 蒸馏操作知识为抽象规则，通过 case-based 持续学习选择性强化。在 GAIA 验证集达到 top-1 (87.88% Pass@3)，**无需微调底层 LLM**。
+26. **A-MEM** (NeurIPS 2025) — Zettelkasten 式记忆结构：每条记忆含原始内容、时间戳、LLM 生成的关键词/标签、上下文描述、dense embedding 和动态链接。新记忆触发对已有记忆的追溯更新。
 
-### 6.7 GEPA 项目已有研究
+### 6.7 层级抽取与渐进抽象
 
-25. **Shared Active Subset** — 共享信息性测试子集 (knowledge/ideas/)
-26. **SPRT Adaptive Gate** — 序贯概率比检验替代固定 minibatch gate (knowledge/ideas/)
-27. **Ensemble Evolution** — 集成感知的进化优化 (knowledge/ideas/)
+27. **Mem^p** (2025) — 程序性记忆的渐进抽象：同时维护细粒度 step-by-step 指令和高层 script-like 抽象。**直接对应我们的层级抽取架构**。
+28. **ReMe** (2025) — 多面蒸馏：识别成功模式、分析失败触发因素、生成对比洞察。
+29. **NEXUSSUM** (ACL 2025) — 三阶段层级多智能体摘要框架，BERTScore 提升 30%。
+
+### 6.8 层级搜索空间
+
+30. **Context-Free Grammar-Based Hierarchical NAS** (NeurIPS 2024) — 基于上下文无关文法的层级搜索空间统一框架，可生成比标准空间大 100+ 数量级的搜索空间。**关键启示**: 文法可以自然表达组合式、层级化的搜索空间结构，直接适用于记忆抽取管道的搜索空间定义。
+31. **LaMOO** (JMLR 2024) — 学习搜索空间分区，聚焦于可能包含 Pareto 最优解的区域。比标准 BO 和进化方法提升 200%+ 样本效率。
+
+### 6.9 GEPA 项目已有研究
+
+32. **Shared Active Subset** — 共享信息性测试子集 (knowledge/ideas/)
+33. **SPRT Adaptive Gate** — 序贯概率比检验替代固定 minibatch gate (knowledge/ideas/)
+34. **Ensemble Evolution** — 集成感知的进化优化 (knowledge/ideas/)
 
 ---
 
@@ -642,7 +655,7 @@ Promptbreeder 同时进化 task-prompt 和 mutation-prompt。映射到记忆系�
 
 ## 9. 与现有 GEPA 组件的关系
 
-### 8.1 MemoryAdapter 的改造方向
+### 9.1 MemoryAdapter 的改造方向
 
 当前 `MemoryAdapter` 将记忆视为一个扁平的 XML key-value store，通过 edit-based mutation 逐步改进。这个设计在以下情况下工作：
 
@@ -652,7 +665,7 @@ Promptbreeder 同时进化 task-prompt 和 mutation-prompt。映射到记忆系�
 
 当数据集增大或记忆系统需要更精细的领域专业化时，需要引入本文档描述的架构搜索方法。
 
-### 8.2 RoutingMemoryAdapter 是天然的桥梁
+### 9.2 RoutingMemoryAdapter 是天然的桥梁
 
 `RoutingMemoryAdapter` 已经实现了关键的基础设施:
 - **Per-query routing**: 可以精确知道哪些 entry 被用于哪些查询
@@ -661,7 +674,7 @@ Promptbreeder 同时进化 task-prompt 和 mutation-prompt。映射到记忆系�
 
 在此基础上，Block-wise optimization 和 Targeted evaluation 可以自然地集成。
 
-### 8.3 不需要改变的部分
+### 9.3 不需要改变的部分
 
 - GEPA 的核心进化循环 (`engine.py`)
 - Pareto 前沿管理 (`state.py`)
@@ -686,12 +699,20 @@ Promptbreeder 同时进化 task-prompt 和 mutation-prompt。映射到记忆系�
 
 ## 11. 总结
 
-Memory Adapter 的效率瓶颈本质上是**局部变异 vs 全局评估**的矛盾。NAS 领域在过去十年中发展出了丰富的技术来处理类似的搜索效率问题。
+Memory Adapter 的效率瓶颈本质上是**局部变异 vs 全局评估**的矛盾。NAS 领域和最新的 LLM 记忆系统研究都为解决这个问题提供了丰富的技术方案。
 
-最有前景的三个方向是:
+最有前景的四个方向是:
 
-1. **Block-wise Modular Optimization**: 将大问题分解为小问题，让 GEPA 的 minibatch gate 重新有效
-2. **Proxy-based Evaluation**: 用零成本代理指标替代昂贵的 LLM 评估
-3. **Targeted Evaluation**: 利用变异的局部性，只评估受影响的样本
+1. **Block-wise Modular Optimization** (NAS: DNA/HEP-NAS): 将大问题分解为小问题，让 GEPA 的 minibatch gate 重新有效
+2. **Proxy-based Evaluation** (NAS: Zero-Cost Proxies): 用零成本代理指标替代昂贵的 LLM 评估
+3. **Targeted Evaluation** (NAS: Weight Sharing): 利用变异的局部性，只评估受影响的样本
+4. **MIPROv2-style 组合搜索** (Compound AI: DSPy): 先 bootstrap 生成候选版本池，再搜索最优组合
 
-这三者可以组合使用，预期能将记忆系统优化的成本降低 10-50 倍，使其在实际应用中变得可行。
+来自 LLM 记忆系统文献的额外关键启示:
+
+- **RL 是记忆优化的前沿** (Memory-R1, Mem-alpha): 仅需 ~150 个训练样本就能大幅超越启发式方法。GEPA 的进化搜索可以看作是 RL 的一种替代，但可以考虑将 RL 信号融入评估。
+- **小数据可泛化** (Mem-alpha): 在 30k tokens 上训练的策略泛化到 400k+，说明在代表性子集上优化是可行的。
+- **层级抽取是最优实践** (RAPTOR, Mem^p): 同时维护多粒度的知识表示（原始事实 + 聚合模式 + 抽象规则），不同查询在不同粒度获取信息。这验证了我们的层级抽取管道设计。
+- **RAPTOR 的 collapsed tree 发现**: 同时查询所有层级优于逐层遍历，意味着记忆系统应该允许跨层检索。
+
+这些方向可以组合使用，预期能将记忆系统优化的成本降低 10-50 倍，使其在实际应用中变得可行。

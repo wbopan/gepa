@@ -515,22 +515,92 @@ MEMORY_SEARCH_SPACE = {
 12. **EGBO** (2024) — 进化引导贝叶斯优化，集成选择压力与 qNEHVI
 13. **Multi-Objective Differentiable NAS** (2024) — 编码用户偏好实现多目标平衡
 
-### 6.4 LLM 记忆系统文献
+### 6.4 Compound AI 系统优化 (与 GEPA 最直接相关)
 
-14. **MemGPT/Letta** — 层级记忆管理系统，区分工作记忆和长期记忆
-15. **RAPTOR** (Sarthi et al., 2024) — 递归抽象处理树，层级化文档总结和检索
-16. **Self-RAG** (Asai et al., 2024) — 自适应检索增强生成
-17. **GraphRAG** (Microsoft, 2024) — 基于知识图谱的检索增强
+14. **DSPy / MIPROv2** (Khattab et al., 2023; Opsahl-Ong et al., 2024) — 模块化 LM 程序优化框架。MIPROv2 使用三阶段策略：Bootstrapping (运行管道收集 traces) → Grounded Proposal (利用 traces+code+data 起草候选指令) → Discrete Search (贝叶斯优化 TPE 搜索指令×示例的组合空间)。**本质上是 LLM prompt 管道的 NAS**：搜索空间=所有模块的指令×示例组合，搜索策略=surrogate-based BO，评估=端到端管道性能。
+15. **TextGrad** (Yuksekgonul et al., 2025) — "文本的 Autograd"，用 LLM 反馈作为梯度信号迭代优化文本输出。与 DSPy 互补：TextGrad 擅长 test-time refinement，DSPy 擅长 compile-time optimization。
+16. **EvoPrompt** (Guo et al., ICLR 2024) — 将 LLM 与进化算法 (GA/DE) 结合做离散 prompt 优化。在 BIG-Bench Hard 上比手工 prompt 提升 25%。关键洞察：LLM 可以充当进化算法中的变异/交叉算子。
+17. **Promptbreeder** (Fernando et al., ICML 2024) — 自指涉自改进：同时进化 task-prompt 和 mutation-prompt。元级别变异是关键创新——搜索策略本身在进化。类比 NAS 中"学习控制器"。
+18. **TRIPLE** (NeurIPS 2024) — 将 prompt 选择建模为多臂老虎机的最优臂识别问题。使用自适应采样高效识别最优 prompt。比基线提升 3-16%。
 
-### 6.5 GEPA 项目已有研究
+### 6.5 LLM 记忆系统文献
 
-18. **Shared Active Subset** — 共享信息性测试子集 (knowledge/ideas/)
-19. **SPRT Adaptive Gate** — 序贯概率比检验替代固定 minibatch gate (knowledge/ideas/)
-20. **Ensemble Evolution** — 集成感知的进化优化 (knowledge/ideas/)
+19. **MemGPT/Letta** — 层级记忆管理系统，区分工作记忆和长期记忆
+20. **RAPTOR** (Sarthi et al., 2024) — 递归抽象处理树，层级化文档总结和检索
+21. **Self-RAG** (Asai et al., 2024) — 自适应检索增强生成
+22. **GraphRAG** (Microsoft, 2024) — 基于知识图谱的检索增强
+
+### 6.6 层级搜索空间
+
+23. **Context-Free Grammar-Based Hierarchical NAS** (NeurIPS 2024) — 基于上下文无关文法的层级搜索空间统一框架，可生成比标准空间大 100+ 数量级的搜索空间。**关键启示**: 文法可以自然表达组合式、层级化的搜索空间结构，直接适用于记忆抽取管道的搜索空间定义。
+24. **LaMOO** (JMLR 2024) — 学习搜索空间分区，聚焦于可能包含 Pareto 最优解的区域。比标准 BO 和进化方法提升 200%+ 样本效率。
+
+### 6.7 GEPA 项目已有研究
+
+25. **Shared Active Subset** — 共享信息性测试子集 (knowledge/ideas/)
+26. **SPRT Adaptive Gate** — 序贯概率比检验替代固定 minibatch gate (knowledge/ideas/)
+27. **Ensemble Evolution** — 集成感知的进化优化 (knowledge/ideas/)
 
 ---
 
-## 7. 实施路线图
+## 7. 关键启示: DSPy MIPROv2 的方法论映射
+
+NAS Agent 调研中发现的 **DSPy/MIPROv2** 框架与 GEPA Memory Adapter 的问题最为对口。MIPROv2 解决的正是"多模块 LLM 管道的组合优化"问题，其方法论可直接映射到记忆系统优化：
+
+### 7.1 MIPROv2 三阶段策略 → 记忆系统的映射
+
+| MIPROv2 阶段 | 记忆系统对应 | 实现方式 |
+|-------------|------------|---------|
+| **Stage 1: Bootstrapping** — 运行管道，收集 traces，按质量过滤 | **记忆种子生成** — 在整个数据集上运行，收集失败案例和成功模式 | 一次性前置成本，不在循环内 |
+| **Stage 2: Grounded Proposal** — 用 traces+code+data 起草候选指令 | **记忆条目生成** — 基于失败模式和知识缺口提出候选记忆内容 | 类似现有的 reflective mutation |
+| **Stage 3: Discrete Search** — TPE 贝叶斯优化搜索组合空间 | **记忆组合优化** — 搜索哪些 entry 的哪个版本组合效果最好 | **新增**: 用 BO 替代逐条编辑 |
+
+### 7.2 核心洞察: 将记忆优化从"逐条编辑"重构为"组合搜索"
+
+当前 GEPA MemoryAdapter 的范式:
+```
+循环: 选择一条 entry → edit → 在整个数据集上评估 → 接受/拒绝
+问题: 每次只改一条，需要整个数据集评估，效率极低
+```
+
+借鉴 MIPROv2 的范式:
+```
+Phase 1 (离线): 在整个数据集上 bootstrap，生成 N 个候选 entry 版本池
+Phase 2 (搜索): 用贝叶斯优化搜索 entry 版本的最优组合
+  搜索空间: entry_1 ∈ {v1_a, v1_b, v1_c} × entry_2 ∈ {v2_a, v2_b} × ...
+  每次评估: 在固定的代表性子集上评估组合效果
+  优化器: TPE (Tree-Parzen Estimator) 或 GEPA 自己的进化搜索
+```
+
+**关键区别**: 不再是"每次改一条 entry 然后全量评估"，而是:
+1. **前置成本**: 一次性生成候选 entry 版本池 (利用全数据集的信息)
+2. **搜索成本**: 搜索最优组合 (每次评估只需代表性子集，因为是比较不同组合)
+3. **组合空间**: $\prod_i |V_i|$ 个可能组合，用 BO/进化搜索高效探索
+
+### 7.3 Promptbreeder 的元变异思想
+
+Promptbreeder 同时进化 task-prompt 和 mutation-prompt。映射到记忆系统:
+
+- **Task-prompt → Memory entries**: 直接给 LLM 使用的知识
+- **Mutation-prompt → Extraction strategy**: 控制如何从数据集中提取知识
+
+当前 `EDIT_PROPOSAL_PROMPT` 是固定的变异指令。如果我们同时进化这个指令本身，就能让系统学习"什么样的记忆提取策略对当前任务最有效"。
+
+---
+
+## 8. 实施路线图
+
+### Phase 0: MIPROv2-style Bootstrap (前置阶段)
+
+**目标**: 一次性生成高质量的候选记忆版本池
+
+改动:
+1. 在整个数据集上运行 seed candidate，收集所有 traces
+2. 按错误类型聚类，识别知识缺口
+3. 为每个缺口生成多个候选 entry 版本
+4. 输出: `entry_version_pool = {entry_key: [version_1, version_2, ...]}`
+
+**预期效果**: 避免在循环中反复全量评估，前置成本一次性付出
 
 ### Phase 1: Proxy Gate + Targeted Evaluation (最小可行方案)
 
@@ -570,7 +640,7 @@ MEMORY_SEARCH_SPACE = {
 
 ---
 
-## 8. 与现有 GEPA 组件的关系
+## 9. 与现有 GEPA 组件的关系
 
 ### 8.1 MemoryAdapter 的改造方向
 
@@ -602,7 +672,7 @@ MEMORY_SEARCH_SPACE = {
 
 ---
 
-## 9. 风险与缓解
+## 10. 风险与缓解
 
 | 风险 | 缓解策略 |
 |------|---------|
@@ -614,7 +684,7 @@ MEMORY_SEARCH_SPACE = {
 
 ---
 
-## 10. 总结
+## 11. 总结
 
 Memory Adapter 的效率瓶颈本质上是**局部变异 vs 全局评估**的矛盾。NAS 领域在过去十年中发展出了丰富的技术来处理类似的搜索效率问题。
 
